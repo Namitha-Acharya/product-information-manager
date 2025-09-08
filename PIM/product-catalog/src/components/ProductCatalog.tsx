@@ -38,8 +38,20 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({ onCreateProduct }) => {
 
   const loadFilterOptions = async () => {
     try {
-      // Load unique values for key filterable fields
-      const fieldsToLoad: (keyof Product)[] = ['categories', 'brand', 'type', 'enable_product', 'visibility'];
+      // Load unique values for key filterable fields including option fields
+      const fieldsToLoad: (keyof Product)[] = [
+        'categories', 
+        'brand', 
+        'type', 
+        'enable_product', 
+        'visibility',
+        'color',
+        'tax_class',
+        'product_visibility',
+        'customization',
+        'is_customizable_product',
+        'customization_type'
+      ];
       const options: Record<string, string[]> = {};
       
       await Promise.all(
@@ -220,7 +232,8 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({ onCreateProduct }) => {
   };
 
   const shouldUseDropdown = (field: keyof Product) => {
-    return filterOptions[field] && filterOptions[field].length > 0;
+    // Always use dropdown for option fields, or if we have pre-loaded filter options
+    return BaserowService.isOptionField(field) || (filterOptions[field] && filterOptions[field].length > 0);
   };
 
   // Define columns configuration

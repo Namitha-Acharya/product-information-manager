@@ -260,7 +260,14 @@ export class BaserowService {
             // Handle other field filters
             const baserowFieldName = this.getBaserowFieldName(filterKey);
             if (baserowFieldName) {
-              params[`filter__${baserowFieldName}__contains`] = filterValue;
+              // Check if this is an option field
+              if (this.isOptionField(filterKey as keyof Product)) {
+                // For option fields, filter by the exact value in the option object
+                params[`filter__${baserowFieldName}__value__equal`] = filterValue;
+              } else {
+                // For regular fields, use contains filter
+                params[`filter__${baserowFieldName}__contains`] = filterValue;
+              }
             }
           }
         }
@@ -455,23 +462,62 @@ export class BaserowService {
     try {
       // Get all products (without pagination) to extract unique values
       const response = await api.get('/', { params: { size: 1000 } });
-      const products = response.data.results.map((product: BaserowProduct) => 
-        this.convertBaserowToProduct(product)
-      );
+      const products = response.data.results;
       
-      // Extract unique values for the specified field
-      const values = products
-        .map((product: Product) => product[fieldName])
-        .filter((value: any) => value && value.toString().trim() !== '')
-        .map((value: any) => value.toString().trim());
+      // Get the corresponding Baserow field name
+      const baserowFieldName = this.getBaserowFieldName(fieldName);
       
-      const uniqueValues = Array.from(new Set(values)).sort() as string[];
+      // Check if this is an option field by examining the data structure
+      const isOptionField = this.isOptionField(fieldName);
       
-      return uniqueValues;
+      if (isOptionField) {
+        // For option fields, extract the 'value' from the option objects
+        const values = products
+          .map((product: BaserowProduct) => {
+            const fieldValue = product[baserowFieldName as keyof BaserowProduct];
+            if (fieldValue && typeof fieldValue === 'object' && fieldValue.value) {
+              return fieldValue.value;
+            }
+            return null;
+          })
+          .filter((value: any) => value && value.toString().trim() !== '');
+        
+        const uniqueValues = Array.from(new Set(values)).sort() as string[];
+        return uniqueValues;
+      } else {
+        // For regular fields, use the converted products
+        const convertedProducts = products.map((product: BaserowProduct) => 
+          this.convertBaserowToProduct(product)
+        );
+        
+        const values = convertedProducts
+          .map((product: Product) => product[fieldName])
+          .filter((value: any) => value && value.toString().trim() !== '')
+          .map((value: any) => value.toString().trim());
+        
+        const uniqueValues = Array.from(new Set(values)).sort() as string[];
+        return uniqueValues;
+      }
     } catch (error) {
       console.error(`Error fetching unique values for ${fieldName}:`, error);
       return [];
     }
+  }
+
+  // Helper method to determine if a field is an option field
+  static isOptionField(fieldName: keyof Product): boolean {
+    const optionFields: (keyof Product)[] = [
+      'enable_product',
+      'color', 
+      'type',
+      'tax_class',
+      'visibility',
+      'product_visibility',
+      'customization',
+      'is_customizable_product',
+      'customization_type'
+    ];
+    return optionFields.includes(fieldName);
   }
 
   static async getCategoriesWithSubcategories() {
