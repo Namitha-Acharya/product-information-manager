@@ -309,10 +309,37 @@ export class BaserowService {
     }
   }
 
+  // Convert clean Product format back to Baserow field format for updating
+  static convertProductToBaserowFormat(product: Partial<Product>): Partial<BaserowProduct> {
+    const baserowData: Partial<BaserowProduct> = {};
+    
+    // Map each field back to its Baserow field name
+    Object.keys(product).forEach(key => {
+      const value = product[key as keyof Product];
+      if (value !== undefined && value !== null) {
+        const baserowFieldName = this.getBaserowFieldName(key);
+        
+        // Handle option fields - for now, just send the value as string
+        // Baserow will handle the option ID mapping on the backend
+        if (this.isOptionField(key as keyof Product)) {
+          // For option fields, we send the value as string and let Baserow handle it
+          (baserowData as any)[baserowFieldName] = value;
+        } else {
+          (baserowData as any)[baserowFieldName] = value;
+        }
+      }
+    });
+    
+    return baserowData;
+  }
+
   // Update a product
   static async updateProduct(id: number, product: Partial<Product>) {
     try {
-      const response = await api.patch(`/${id}/`, product);
+      // Convert the product data to Baserow format
+      const baserowData = this.convertProductToBaserowFormat(product);
+      
+      const response = await api.patch(`/${id}/`, baserowData);
       return response.data;
     } catch (error) {
       console.error('Error updating product:', error);

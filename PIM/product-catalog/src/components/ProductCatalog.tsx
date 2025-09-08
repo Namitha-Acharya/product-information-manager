@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, MoreHorizontal, Plus, Trash2, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { Search, Filter, Plus, Trash2, ArrowUpDown, ArrowUp, ArrowDown, X, Edit2, Save, XCircle } from 'lucide-react';
 import { BaserowService, Product } from '../services/baserowApi';
 import './ProductCatalog.css';
 
@@ -35,6 +35,8 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({ onCreateProduct }) => {
   const [showFilterRow, setShowFilterRow] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filterOptions, setFilterOptions] = useState<Record<string, string[]>>({});
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
 
   const loadFilterOptions = async () => {
     try {
@@ -214,6 +216,36 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({ onCreateProduct }) => {
     setColumnFilters(prev => prev.filter(f => f.field !== field));
   };
 
+  const handleEditProduct = (product: Product) => {
+    setEditingProductId(product.id!);
+    setEditingProduct({ ...product });
+  };
+
+  const handleSaveProduct = async () => {
+    if (!editingProductId || !editingProduct) return;
+    
+    try {
+      await BaserowService.updateProduct(editingProductId, editingProduct);
+      setEditingProductId(null);
+      setEditingProduct({});
+      loadProducts(); // Refresh the data
+    } catch (error) {
+      console.error('Failed to update product:', error);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProductId(null);
+    setEditingProduct({});
+  };
+
+  const handleFieldChange = (field: keyof Product, value: any) => {
+    setEditingProduct(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   const getSortIcon = (field: keyof Product) => {
     if (sortConfig.field !== field) {
       return <ArrowUpDown size={14} className="sort-icon" />;
@@ -234,6 +266,78 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({ onCreateProduct }) => {
   const shouldUseDropdown = (field: keyof Product) => {
     // Always use dropdown for option fields, or if we have pre-loaded filter options
     return BaserowService.isOptionField(field) || (filterOptions[field] && filterOptions[field].length > 0);
+  };
+
+  const renderEditableCell = (product: Product, field: keyof Product) => {
+    const isEditing = editingProductId === product.id;
+    const currentValue = isEditing ? (editingProduct[field] || '') : (product[field] || '');
+
+    if (!isEditing) {
+      // Display mode
+      if (field === 'image') {
+        return product.image ? (
+          <img src={product.image} alt={product.name} className="product-thumbnail" />
+        ) : (
+          <div className="no-image">No Image</div>
+        );
+      } else if (field === 'price' || field === 'sample_price') {
+        return typeof product[field] === 'number' 
+          ? `₹${(product[field] as number).toFixed(2)}` 
+          : (product[field] || '-');
+      } else {
+        return String(product[field] || '');
+      }
+    }
+
+    // Edit mode
+    if (field === 'image') {
+      return (
+        <input
+          type="text"
+          value={currentValue as string}
+          onChange={(e) => handleFieldChange(field, e.target.value)}
+          className="edit-input"
+          placeholder="Image URL"
+        />
+      );
+    } else if (BaserowService.isOptionField(field) && filterOptions[field]) {
+      // Dropdown for option fields
+      return (
+        <select
+          value={currentValue as string}
+          onChange={(e) => handleFieldChange(field, e.target.value)}
+          className="edit-select"
+        >
+          <option value="">Select {field}</option>
+          {filterOptions[field].map(option => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      );
+    } else if (field === 'price' || field === 'sample_price' || field === 'quantity') {
+      // Number input for numeric fields
+      return (
+        <input
+          type="number"
+          value={currentValue as string}
+          onChange={(e) => handleFieldChange(field, parseFloat(e.target.value) || 0)}
+          className="edit-input"
+          step="0.01"
+        />
+      );
+    } else {
+      // Text input for regular fields
+      return (
+        <input
+          type="text"
+          value={currentValue as string}
+          onChange={(e) => handleFieldChange(field, e.target.value)}
+          className="edit-input"
+        />
+      );
+    }
   };
 
   // Define columns configuration
@@ -423,23 +527,24 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({ onCreateProduct }) => {
                     </td>
                     {columns.map(column => (
                       <td key={`${product.id}-${column.field}`} className={column.field === 'image' ? 'image-cell' : column.field.includes('description') ? 'description' : ''}>
-                        {column.field === 'image' ? (
-                          product.image ? (
-                            <img src={product.image} alt={product.name} className="product-thumbnail" />
-                          ) : (
-                            <div className="no-image">No Image</div>
-                          )
-                        ) : column.field === 'price' || column.field === 'sample_price' ? (
-                          typeof product[column.field] === 'number' ? `₹${(product[column.field] as number).toFixed(2)}` : (product[column.field] || '-')
-                        ) : (
-                          String(product[column.field] || '')
-                        )}
+                        {renderEditableCell(product, column.field)}
                       </td>
                     ))}
                     <td className="actions-cell">
-                      <button className="btn-icon">
-                        <MoreHorizontal size={16} />
-                      </button>
+                      {editingProductId === product.id ? (
+                        <div className="edit-actions">
+                          <button className="btn-icon save" onClick={handleSaveProduct} title="Save">
+                            <Save size={16} />
+                          </button>
+                          <button className="btn-icon cancel" onClick={handleCancelEdit} title="Cancel">
+                            <XCircle size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button className="btn-icon edit" onClick={() => handleEditProduct(product)} title="Edit">
+                          <Edit2 size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

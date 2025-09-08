@@ -709,9 +709,78 @@
 .actions-header,
 .actions-filter,
 .actions-cell {
-  width: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
   text-align: center !important;
   padding: 12px 8px !important;
+}
+
+/* Inline editing styles */
+.btn-icon {
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background-color: #f0f0f0;
+}
+
+.btn-icon.edit {
+  color: #4a90e2;
+}
+
+.btn-icon.save {
+  color: #28a745;
+}
+
+.btn-icon.cancel {
+  color: #dc3545;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+}
+
+.edit-input,
+.edit-select {
+  width: 100%;
+  min-width: 80px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  background-color: white;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.edit-input:focus,
+.edit-select:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+.edit-select {
+  cursor: pointer;
+}
+
+/* Ensure proper sizing for edit inputs in different columns */
+.image-cell .edit-input {
+  min-width: 120px;
+}
+
+.description .edit-input {
+  min-width: 150px;
 }
