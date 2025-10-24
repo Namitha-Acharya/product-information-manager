@@ -23,6 +23,7 @@ export default function (
     base + '/modules/builder/module.js',
     base + '/modules/dashboard/module.js',
     base + '/modules/automation/module.js',
+    base + '/modules/products/module.js',
   ]
   if (!process.env.BASEROW_OSS_ONLY) {
     baseModules.push(

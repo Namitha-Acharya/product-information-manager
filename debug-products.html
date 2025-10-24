@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Baserow Products</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .debug { background: #f0f0f0; padding: 15px; margin: 10px 0; border: 1px solid #ccc; }
+        .error { background: #ffebee; border-color: #f44336; }
+        .success { background: #e8f5e9; border-color: #4caf50; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Baserow Products API</h1>
+    
+    <div id="status" class="debug">
+        Loading...
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        const token = 'BuYwkmQrRVV3jB5fuXxiqTTNPzBa1c3C';
+        const tableId = 734;
+        
+        async function testAPI() {
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                statusEl.innerHTML = '🧪 Testing API connection...';
+                statusEl.className = 'debug';
+                
+                const response = await fetch(`http://localhost/api/database/rows/table/${tableId}/?size=5`, {
+                    headers: {
+                        'Authorization': `Token ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                statusEl.innerHTML = `✅ API Success! Found ${data.count} total products, showing ${data.results.length}`;
+                statusEl.className = 'debug success';
+                
+                // Show data in table
+                if (data.results && data.results.length > 0) {
+                    const firstRow = data.results[0];
+                    const fields = Object.keys(firstRow);
+                    
+                    let html = '<h2>📊 Product Data Preview</h2>';
+                    html += `<p><strong>Total Products:</strong> ${data.count}</p>`;
+                    html += '<table>';
+                    html += '<thead><tr>';
+                    fields.forEach(field => {
+                        html += `<th>${field}</th>`;
+                    });
+                    html += '</tr></thead><tbody>';
+                    
+                    data.results.forEach(row => {
+                        html += '<tr>';
+                        fields.forEach(field => {
+                            let value = row[field];
+                            if (Array.isArray(value)) {
+                                value = JSON.stringify(value);
+                            }
+                            html += `<td>${value || '-'}</td>`;
+                        });
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    
+                    // Show field_7007 specifically
+                    html += '<h2>🎯 Product Type 2 Field (field_7007) Values</h2>';
+                    html += '<ul>';
+                    data.results.forEach((row, index) => {
+                        const field7007 = row.field_7007;
+                        html += `<li><strong>Row ${index + 1}:</strong> ${JSON.stringify(field7007) || 'null'}</li>`;
+                    });
+                    html += '</ul>';
+                    
+                    resultsEl.innerHTML = html;
+                } else {
+                    resultsEl.innerHTML = '<div class="debug error">❌ No data returned</div>';
+                }
+                
+            } catch (error) {
+                statusEl.innerHTML = `❌ API Error: ${error.message}`;
+                statusEl.className = 'debug error';
+                resultsEl.innerHTML = `<div class="debug error">
+                    <h3>Error Details</h3>
+                    <p><strong>Message:</strong> ${error.message}</p>
+                    <p><strong>Token:</strong> ${token.substring(0, 10)}...</p>
+                    <p><strong>URL:</strong> http://localhost/api/database/rows/table/${tableId}/?size=5</p>
+                </div>`;
+            }
+        }
+        
+        // Run test when page loads
+        testAPI();
+    </script>
+</body>
+</html>

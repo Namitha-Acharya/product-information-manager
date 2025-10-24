@@ -1,0 +1,19 @@
+// Products Module Styles
+
+// Import base Baserow styles
+@import '~@baserow/modules/core/assets/scss/abstracts/all';
+
+// Products specific styles
+.products-module {
+  // Additional global styles for the products module can be added here
+  
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: opacity 0.3s ease;
+  }
+  
+  .fade-enter,
+  .fade-leave-to {
+    opacity: 0;
+  }
+}
