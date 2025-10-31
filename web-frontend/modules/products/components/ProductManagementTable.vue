@@ -21,12 +21,55 @@
                 </svg>
                 <span>Filter</span>
               </button>
+              <button class="toolbar-btn" @click="toggleFieldSelector" :class="{ active: showFieldSelector }" title="Show/Hide Fields">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>
+                </svg>
+                <span>Fields</span>
+                <span class="field-count">{{ visibleFieldsCount }}/{{ allFieldsCount }}</span>
+              </button>
               <button class="toolbar-btn" @click="refreshData" :disabled="loading" title="Refresh data from API">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
                 </svg>
                 <span>{{ loading ? 'Loading...' : 'Refresh' }}</span>
               </button>
+
+              <!-- Field Selector Panel (shown when Fields button is active) -->
+              <div v-if="showFieldSelector" class="field-selector-panel" @click.stop>
+                <div class="field-selector-header">
+                  <div class="field-selector-search">
+                    <input
+                      v-model="fieldSearchTerm"
+                      type="text"
+                      placeholder="Search fields..."
+                      class="field-search-input"
+                    >
+                  </div>
+                  <div class="field-selector-actions">
+                    <button @click="showAllFields" class="btn-field-action">Show all</button>
+                    <button @click="hideAllFields" class="btn-field-action">Hide all</button>
+                  </div>
+                </div>
+                <div class="field-selector-list">
+                  <div
+                    v-for="field in filteredAllFields"
+                    :key="field.id"
+                    class="field-selector-item">
+                    <label class="field-checkbox-label">
+                      <input
+                        type="checkbox"
+                        :checked="isFieldVisible(field)"
+                        @change="toggleFieldVisibility(field)"
+                        class="field-checkbox"
+                      >
+                      <span class="field-icon">{{ getFieldIcon(field.type) }}</span>
+                      <span class="field-name">{{ formatFieldName(field.name) }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="toolbar-right">
@@ -42,7 +85,7 @@
                   @input="onSearchChange"
                 >
               </div>
-              <button @click="showAddModal = true" class="btn-add">➕ Add New Product</button>
+              <button v-if="!showFilters" @click="showAddModal = true" class="btn-add">➕ Add New Product</button>
             </div>
           </div>
 
@@ -69,6 +112,7 @@
             </div>
 
             <button @click="clearFilters" class="btn-clear-filters">Clear all filters</button>
+            <button @click="showAddModal = true" class="btn-add">➕ Add New Product</button>
           </div>
     </div>
 
@@ -94,8 +138,8 @@
           <thead>
             <tr>
               <th class="actions-col">Actions</th>
-              <th v-for="(field, index) in visibleFields"
-                  :key="index"
+              <th v-for="field in visibleFields"
+                  :key="`header-${field.id}`"
                   :title="`field_${field.id}`"
                   class="sortable-header"
                   @click="sortBy(`field_${field.id}`)">
@@ -108,7 +152,7 @@
             <!-- Column Filters Row -->
             <tr class="filter-row">
               <th class="actions-col"></th>
-              <th v-for="(field, index) in visibleFields" :key="`filter-${index}`">
+              <th v-for="field in visibleFields" :key="`filter-${field.id}`">
                 <input
                   v-model="columnFilters[`field_${field.id}`]"
                   type="text"
@@ -133,7 +177,7 @@
                   <button v-if="editingProductId === product.id" @click="cancelEdit" class="btn-cancel" title="Cancel">❌</button>
                 </div>
               </td>
-              <td v-for="(field, fieldIndex) in visibleFields" :key="fieldIndex"
+              <td v-for="field in visibleFields" :key="`cell-${product.id}-${field.id}`"
                   :class="{ editable: editingProductId === product.id && !isReadOnlyField(`field_${field.id}`) }"
                   @click="startCellEdit(product.id, `field_${field.id}`)">
 
@@ -198,14 +242,14 @@
                        @error="$event.target.style.display='none'">
                   <span v-else-if="field.type === 'single_select' && getSelectValue(product[`field_${field.id}`])"
                         class="select-value"
-                        :style="{ backgroundColor: getSelectColor(product[`field_${field.id}`]), color: 'white' }">
+                        :style="{ color: 'black' }">
                     {{ getSelectValue(product[`field_${field.id}`]) }}
                   </span>
                   <div v-else-if="field.type === 'multiple_select' && product[`field_${field.id}`] && Array.isArray(product[`field_${field.id}`]) && product[`field_${field.id}`].length > 0"
                        class="multiple-select-display">
                     <span v-for="item in product[`field_${field.id}`]" :key="item.id"
                           class="select-value"
-                          :style="{ backgroundColor: item.color, color: 'white' }">
+                          :style="{ color: 'black' }">
                       {{ item.value }}
                     </span>
                   </div>
@@ -291,19 +335,14 @@
                   <label class="required-label">Website</label>
                   <select v-model="newProduct.website" class="form-select">
                     <option value="">-Select-</option>
-                    <option value="Offineeds">Offineeds</option>
-                    <option value="TCGS">TCGS</option>
-                    <option value="Both">Both</option>
+                    <option v-for="option in dropdownOptions.website" :key="option" :value="option">{{ option }}</option>
                   </select>
                 </div>
                 <div class="form-field">
                   <label class="required-label">Product Type</label>
                   <select v-model="newProduct.productType" class="form-select">
                     <option value="">-Select-</option>
-                    <option value="Simple">Simple</option>
-                    <option value="Configurable">Configurable</option>
-                    <option value="Virtual">Virtual</option>
-                    <option value="Bundle">Bundle</option>
+                    <option v-for="option in dropdownOptions.productType" :key="option" :value="option">{{ option }}</option>
                   </select>
                 </div>
                 <div class="form-field"></div>
@@ -350,20 +389,7 @@
                   <label class="required-label">Color Name</label>
                   <select v-model="newProduct.colorName" class="form-select">
                     <option value="">-Select-</option>
-                    <option value="Red">Red</option>
-                    <option value="Blue">Blue</option>
-                    <option value="Green">Green</option>
-                    <option value="Black">Black</option>
-                    <option value="White">White</option>
-                    <option value="Yellow">Yellow</option>
-                    <option value="Orange">Orange</option>
-                    <option value="Purple">Purple</option>
-                    <option value="Pink">Pink</option>
-                    <option value="Brown">Brown</option>
-                    <option value="Grey">Grey</option>
-                    <option value="Silver">Silver</option>
-                    <option value="Gold">Gold</option>
-                    <option value="Multi Color">Multi Color</option>
+                    <option v-for="option in dropdownOptions.colorName" :key="option" :value="option">{{ option }}</option>
                   </select>
                 </div>
                 <div class="form-field">
@@ -387,21 +413,31 @@
               <div class="form-row-3col">
                 <div class="form-field">
                   <label class="required-label">Brand Name</label>
-                  <select v-model="newProduct.brandName" class="form-select">
-                    <option value="">-Select-</option>
-                    <option value="Generic">Generic</option>
-                    <option value="Premium Brand">Premium Brand</option>
-                    <option value="Custom">Custom</option>
-                  </select>
+                  <div class="searchable-select">
+                    <input
+                      v-model="brandSearchTerm"
+                      @focus="showBrandDropdown = true"
+                      @blur="hideBrandDropdown"
+                      @input="filterBrands"
+                      type="text"
+                      class="form-input searchable-input"
+                      :placeholder="newProduct.brandName || 'Search or select brand...'"
+                    >
+                    <div v-if="showBrandDropdown && filteredBrands.length > 0" class="dropdown-list">
+                      <div
+                        v-for="brand in filteredBrands"
+                        :key="brand"
+                        @mousedown="selectBrand(brand)"
+                        class="dropdown-item"
+                      >
+                        {{ brand }}
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label class="required-label">Vendor Name</label>
-                  <select v-model="newProduct.vendorName" class="form-select">
-                    <option value="">-Select-</option>
-                    <option value="Vendor A">Vendor A</option>
-                    <option value="Vendor B">Vendor B</option>
-                    <option value="Vendor C">Vendor C</option>
-                  </select>
+                  <input v-model="newProduct.vendorName" type="text" class="form-input" readonly>
                 </div>
                 <div class="form-field">
                   <label>Vendor Code</label>
@@ -877,55 +913,108 @@ export default {
       // Tier Price Modal
       showTierPriceModal: false,
       selectedProductForTierPrice: null,
-      selectedProductSku: ''
+      selectedProductSku: '',
+      // Brand-Vendor Mapping from table 732
+      brandVendorMapping: [],
+      // Searchable dropdown state
+      brandSearchTerm: '',
+      showBrandDropdown: false,
+      filteredBrands: [],
+      // Field selector state
+      showFieldSelector: false,
+      fieldSearchTerm: '',
+      hiddenFields: [],
+      // Custom dropdown options for Create Product form
+      dropdownOptions: {
+        website: [
+          'CRM',
+          'CRM and Catalog',
+          'CRM and PDF',
+          'CRM and Shop Offineeds',
+        ],
+        productType: [
+          'New',
+          'Old',
+        ],
+        colorName: [
+          'AAA', 'BBB', 'Beige', 'Black', 'Blue',
+          'Brown', 'Burgundy', 'CCC', 'Copper', 'Cream',
+          'Dark Grey', 'Dark Peach', 'DDD', 'EEE', 'FFF', 'GGG', 'Gold', 'Green', 'Green Melange', 'Grey',
+          'Grey Melange', 'Ice Blue', 'Khaki', 'Lavender', 'Light Blue', 'Light Grey', 'Light Pink', 
+          'Lime Green', 'Magenta', 'Maroon', 'Mustard', 'Natural Brown', 'Navy Blue', 'Olive Green',
+          'Orange', 'Peach', 'Petrol Blue', 'Pink', 'Purple', 'Red', 'Red Melange', 'Siemens Green', 
+          'Silver', 'Sky Blue', 'Tan', 'Teal Blue', 'Teal Green', 'Transparent', 'Turquoise Green', 
+          'White', 'White Melange', 'Wine', 'Yellow',
+        ],
+        brandName: [
+          'Generic',
+          'Premium Brand',
+          'Custom'
+        ],
+        vendorName: [
+          'Vendor A',
+          'Vendor B',
+          'Vendor C'
+        ]
+      }
     }
   },
   
   computed: {
     visibleFields() {
-      // Define the specific fields in the exact order from the images
+      // Define the preferred field order - used for sorting, not filtering
       const fieldOrder = [
-        'id', 'image', 'sku', 'name', 'vendor_code', 'brands', 'mgs_brand',
+        'id', 'image', 'sku', 'name', 'vendor_code', 'manufacturer',
         'color', 'hidden_from_category', 'type', 'attribute_set_id', 'price',
+        'stock_qty', 'is_in_stock',
+        'meta_title', 'meta_keyword', 'meta_description', 'url_key',
         'visibility', 'website_ids', 'delivery_timeline', 'offineeds_delivery_timeline',
         'usual_delivery_times', 'dimensions', 'special_features', 'customisation',
         'material', 'kit_height', 'kit_lenght', 'kit_width'
       ]
-      
-      const filteredFields = this.tableFields.filter(field => {
-        const fieldNameLower = field.name.toLowerCase()
-        const fieldNameOriginal = field.name
-        
-        // Check exact matches and variations
-        return fieldOrder.includes(fieldNameLower) || 
-               fieldOrder.includes(fieldNameOriginal) ||
-               fieldOrder.includes(fieldNameLower.replace(/\s+/g, '_')) ||
-               fieldOrder.includes(fieldNameOriginal.replace(/\s+/g, '_'))
+
+      console.log('🔍 visibleFields computed - Starting with', this.tableFields.length, 'total fields')
+      console.log('🔍 visibleFields computed - Hidden field IDs:', [...this.hiddenFields])
+
+      // STEP 1: Filter out ONLY the hidden fields (not based on fieldOrder)
+      const visibleOnly = this.tableFields.filter(field => !this.hiddenFields.includes(field.id))
+      console.log('🔍 visibleFields computed - After filtering hidden:', visibleOnly.length, 'fields')
+
+      // STEP 2: Sort the visible fields according to fieldOrder preference
+      // Fields in fieldOrder come first in order, others come after
+      const sortedFields = visibleOnly.sort((a, b) => {
+        const aIndex = fieldOrder.findIndex(name => {
+          const fieldNameLower = a.name.toLowerCase()
+          const fieldNameOriginal = a.name
+          return name === fieldNameLower ||
+                 name === fieldNameOriginal ||
+                 name === fieldNameLower.replace(/\s+/g, '_') ||
+                 name === fieldNameOriginal.replace(/\s+/g, '_')
+        })
+        const bIndex = fieldOrder.findIndex(name => {
+          const fieldNameLower = b.name.toLowerCase()
+          const fieldNameOriginal = b.name
+          return name === fieldNameLower ||
+                 name === fieldNameOriginal ||
+                 name === fieldNameLower.replace(/\s+/g, '_') ||
+                 name === fieldNameOriginal.replace(/\s+/g, '_')
+        })
+
+        // If both fields are in fieldOrder, sort by their order
+        if (aIndex !== -1 && bIndex !== -1) {
+          return aIndex - bIndex
+        }
+        // If only a is in fieldOrder, it comes first
+        if (aIndex !== -1) return -1
+        // If only b is in fieldOrder, it comes first
+        if (bIndex !== -1) return 1
+        // If neither is in fieldOrder, maintain original order
+        return 0
       })
-      
-      // Sort fields according to the specified order
-      const sortedFields = filteredFields.sort((a, b) => {
-        const aIndex = fieldOrder.findIndex(name => 
-          name === a.name.toLowerCase() || name === a.name
-        )
-        const bIndex = fieldOrder.findIndex(name => 
-          name === b.name.toLowerCase() || name === b.name
-        )
-        return aIndex - bIndex
-      })
-      
-      // Debug the visible fields to ensure select_options are preserved
-      // Debug the visible fields to ensure select_options are preserved
-      console.log('🔍 Total visible fields found:', sortedFields.length)
-      console.log('🔍 Visible fields with select options:', sortedFields.filter(f => f.type === 'single_select' || f.type === 'multiple_select').map(f => ({
-        name: f.name,
-        type: f.type,
-        hasOptions: !!(f.select_options && f.select_options.length > 0),
-        optionsCount: f.select_options ? f.select_options.length : 0,
-        firstOptions: f.select_options ? f.select_options.slice(0, 3).map(o => o.value) : []
-      })))
-      console.log('🔍 Field names in visible fields:', sortedFields.map(f => f.name))
-      
+
+      console.log('🔍 visibleFields computed - Returning', sortedFields.length, 'sorted fields')
+      console.log('🔍 visibleFields computed - Field names:', sortedFields.map(f => f.name))
+
       return sortedFields
     },
     editableFields() {
@@ -1045,12 +1134,17 @@ export default {
     availableBrands() {
       const brandsField = this.getBrandField()
       if (!brandsField) return []
-      
+
       const brands = new Set()
       this.products.forEach(product => {
         const brandValue = product[`field_${brandsField.id}`]
-        if (brandValue && String(brandValue).trim()) {
-          brands.add(String(brandValue).trim())
+        if (brandValue) {
+          // Handle select field format: {id, value, color}
+          if (typeof brandValue === 'object' && brandValue.value) {
+            brands.add(brandValue.value.trim())
+          } else if (String(brandValue).trim()) {
+            brands.add(String(brandValue).trim())
+          }
         }
       })
       return Array.from(brands).sort()
@@ -1091,6 +1185,26 @@ export default {
       return Math.min(end, this.filteredProducts.length)
     },
 
+    // Field selector computed properties
+    filteredAllFields() {
+      if (!this.fieldSearchTerm) {
+        return this.tableFields
+      }
+      const searchLower = this.fieldSearchTerm.toLowerCase()
+      return this.tableFields.filter(field =>
+        field.name.toLowerCase().includes(searchLower) ||
+        this.formatFieldName(field.name).toLowerCase().includes(searchLower)
+      )
+    },
+
+    visibleFieldsCount() {
+      return this.visibleFields.length
+    },
+
+    allFieldsCount() {
+      return this.tableFields.length
+    },
+
     visiblePages() {
       const pages = []
       const maxVisible = 5
@@ -1117,13 +1231,27 @@ export default {
     },
     selectedType() {
       this.currentPaginationPage = 1
+    },
+    'newProduct.brandName'(newBrand) {
+      if (newBrand) {
+        this.populateVendorFields(newBrand)
+      }
     }
   },
 
   async mounted() {
     console.log('🚀 ProductManagementTable MOUNTED')
     await this.loadFields()
+    await this.loadBrandVendorMapping()
     await this.loadData()
+
+    // Add click-outside handler to close field selector
+    document.addEventListener('click', this.handleClickOutside)
+  },
+
+  beforeDestroy() {
+    // Remove click-outside handler
+    document.removeEventListener('click', this.handleClickOutside)
   },
   
   methods: {
@@ -1148,7 +1276,8 @@ export default {
         }
 
         const data = await response.json()
-        this.tableFields = data.fields || data
+        // Filter out the 'brands' field (field 6370) - we only want 'manufacturer' (field 5012) for Brand (Manufacturer)
+        this.tableFields = (data.fields || data).filter(f => f.name !== 'brands')
         console.log(`✅ Loaded ${this.tableFields.length} fields from cache API:`, this.tableFields.slice(0, 5).map(f => f.name))
         
         // Debug select fields
@@ -1159,13 +1288,110 @@ export default {
           optionsCount: f.select_options ? f.select_options.length : 0,
           hasOptions: !!(f.select_options && f.select_options.length > 0)
         })))
-        
+
+        // Initialize hiddenFields with fields that are not in the predefined fieldOrder
+        // This ensures only the fields we want visible are shown by default
+        const fieldOrder = [
+          'id', 'image', 'sku', 'name', 'vendor_code', 'manufacturer',
+          'color', 'hidden_from_category', 'type', 'attribute_set_id', 'price',
+          'stock_qty', 'is_in_stock',
+          'meta_title', 'meta_keyword', 'meta_description', 'url_key',
+          'visibility', 'website_ids', 'delivery_timeline', 'offineeds_delivery_timeline',
+          'usual_delivery_times', 'dimensions', 'special_features', 'customisation',
+          'material', 'kit_height', 'kit_lenght', 'kit_width'
+        ]
+
+        this.hiddenFields = this.tableFields
+          .filter(field => !fieldOrder.includes(field.name))
+          .map(field => field.id)
+
+        console.log(`🔍 Initialized ${this.hiddenFields.length} hidden fields out of ${this.tableFields.length} total fields`)
+
       } catch (err) {
         console.error('❌ Error loading fields:', err)
         this.error = `Failed to load table fields: ${err.message}`
       }
     },
-    
+
+    async loadBrandVendorMapping() {
+      try {
+        const response = await fetch(`${this.apiBaseUrl}/brand-vendor-mapping`, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to load brand-vendor mapping: ${response.status}`)
+        }
+
+        const data = await response.json()
+        this.brandVendorMapping = data.results || []
+        console.log(`✅ Loaded ${this.brandVendorMapping.length} brand-vendor mappings`)
+
+        // Also populate brandName dropdown from the mapping
+        if (this.brandVendorMapping.length > 0) {
+          this.dropdownOptions.brandName = [...new Set(this.brandVendorMapping.map(item => item.field_10808))].filter(Boolean).sort()
+          console.log(`✅ Updated brand dropdown with ${this.dropdownOptions.brandName.length} brands`)
+        }
+      } catch (err) {
+        console.error('❌ Error loading brand-vendor mapping:', err)
+      }
+    },
+
+    populateVendorFields(brandName) {
+      const mapping = this.brandVendorMapping.find(item => item.field_10808 === brandName)
+
+      if (mapping) {
+        // Populate vendor fields from the mapping
+        this.newProduct.vendorName = mapping.field_10809 || ''
+        this.newProduct.vendorCode = mapping.field_10810 || ''
+        this.newProduct.vendorLocation = mapping.field_10811 || ''
+        this.newProduct.vendorTimeline = mapping.field_10812 || ''
+        this.newProduct.dispatchTimeline = mapping.field_10813 || ''
+        this.newProduct.brandLogic = mapping.field_10814 || ''
+
+        // Calculate Vendor Logic based on Vendor Location
+        if (mapping.field_10811 && mapping.field_10811.toLowerCase() === 'bangalore') {
+          this.newProduct.vendorLogic = 'Blr'
+        } else {
+          this.newProduct.vendorLogic = 'Non-Blr'
+        }
+
+        console.log(`✅ Auto-populated vendor fields for brand: ${brandName}`, {
+          vendorName: this.newProduct.vendorName,
+          vendorCode: this.newProduct.vendorCode,
+          vendorLocation: this.newProduct.vendorLocation,
+          vendorLogic: this.newProduct.vendorLogic
+        })
+      } else {
+        console.log(`⚠️ No mapping found for brand: ${brandName}`)
+      }
+    },
+
+    filterBrands() {
+      if (!this.brandSearchTerm) {
+        this.filteredBrands = this.dropdownOptions.brandName.slice(0, 50) // Show first 50 brands
+      } else {
+        const searchLower = this.brandSearchTerm.toLowerCase()
+        this.filteredBrands = this.dropdownOptions.brandName
+          .filter(brand => brand.toLowerCase().includes(searchLower))
+          .slice(0, 50) // Limit to 50 results for performance
+      }
+    },
+
+    selectBrand(brand) {
+      this.newProduct.brandName = brand
+      this.brandSearchTerm = ''
+      this.showBrandDropdown = false
+    },
+
+    hideBrandDropdown() {
+      setTimeout(() => {
+        this.showBrandDropdown = false
+      }, 200)
+    },
+
     async loadData(forceRefresh = false) {
       this.loading = true
       this.error = null
@@ -1216,10 +1442,15 @@ export default {
       const specialCases = {
         'id': 'ID',
         'sku': 'SKU',
-        'mgs_brand': 'Brand (Manufacturer)',
-        'brands': 'Brand',
+        'manufacturer': 'Brand (Manufacturer)',
         'attribute_set_id': 'Attribute Set',
         'website_ids': 'Websites',
+        'stock_qty': 'Stock Quantity',
+        'is_in_stock': 'Is In Stock',
+        'meta_title': 'Meta Title',
+        'meta_keyword': 'Meta Keyword',
+        'meta_description': 'Meta Description',
+        'url_key': 'URL Key',
         'delivery_timeline': 'Dispatch Timeline (Delivery Timeline)',
         'offineeds_delivery_timeline': 'Dispatch Timeline (Offineeds Delivery Timeline)',
         'usual_delivery_times': 'Dispatch Timeline (Usual Delivery Times)',
@@ -1625,9 +1856,8 @@ export default {
     },
     
     getBrandField() {
-      return this.visibleFields.find(field => 
-        field.name.toLowerCase().includes('brand') || 
-        field.name.toLowerCase().includes('mgs_brand')
+      return this.visibleFields.find(field =>
+        field.name.toLowerCase() === 'manufacturer'
       )
     },
     
@@ -1643,6 +1873,83 @@ export default {
 
     toggleFilters() {
       this.showFilters = !this.showFilters
+    },
+
+    // Field selector methods
+    handleClickOutside(event) {
+      // Close field selector when clicking outside
+      if (this.showFieldSelector) {
+        const fieldSelectorPanel = this.$el.querySelector('.field-selector-panel')
+        const fieldsButton = this.$el.querySelector('.toolbar-btn[title="Show/Hide Fields"]')
+
+        if (fieldSelectorPanel && !fieldSelectorPanel.contains(event.target) &&
+            fieldsButton && !fieldsButton.contains(event.target)) {
+          this.showFieldSelector = false
+        }
+      }
+    },
+
+    toggleFieldSelector() {
+      this.showFieldSelector = !this.showFieldSelector
+      if (this.showFieldSelector) {
+        this.showFilters = false // Close filters when opening field selector
+      }
+    },
+
+    toggleFieldVisibility(field) {
+      console.log('🔄 Toggling field visibility:', field.name, 'ID:', field.id)
+      console.log('📊 Hidden fields before:', [...this.hiddenFields])
+
+      const index = this.hiddenFields.indexOf(field.id)
+      if (index > -1) {
+        // Field is hidden, show it
+        this.hiddenFields.splice(index, 1)
+        console.log('✅ Showing field:', field.name)
+      } else {
+        // Field is visible, hide it
+        this.hiddenFields.push(field.id)
+        console.log('❌ Hiding field:', field.name)
+      }
+
+      console.log('📊 Hidden fields after:', [...this.hiddenFields])
+      console.log('📊 Visible fields count:', this.visibleFields.length)
+
+      // Force reactivity update
+      this.$forceUpdate()
+    },
+
+    isFieldVisible(field) {
+      return !this.hiddenFields.includes(field.id)
+    },
+
+    showAllFields() {
+      console.log('🔄 Showing all fields')
+      this.hiddenFields = []
+      this.$forceUpdate()
+    },
+
+    hideAllFields() {
+      console.log('🔄 Hiding all fields')
+      this.hiddenFields = this.tableFields.map(f => f.id)
+      this.$forceUpdate()
+    },
+
+    getFieldIcon(fieldType) {
+      const icons = {
+        'text': 'T',
+        'long_text': 'T',
+        'number': '#',
+        'boolean': '☑',
+        'date': '📅',
+        'single_select': '⊙',
+        'multiple_select': '⊚',
+        'file': '📎',
+        'url': '🔗',
+        'email': '📧',
+        'phone_number': '📞',
+        'link_row': '🔗',
+      }
+      return icons[fieldType] || 'T'
     },
 
     goToPage(page) {
@@ -1750,6 +2057,7 @@ export default {
   align-items: center;
   gap: 8px;
   flex: 1;
+  position: relative;
 }
 
 .toolbar-right {
@@ -1888,6 +2196,118 @@ export default {
 .btn-clear-filters:hover {
   background: #ff4d4f;
   color: white;
+}
+
+/* Field Selector Panel */
+.field-selector-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 320px;
+  max-height: 500px;
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.field-selector-header {
+  padding: 12px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.field-selector-search {
+  margin-bottom: 12px;
+}
+
+.field-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.field-search-input:focus {
+  outline: none;
+  border-color: #4096ff;
+}
+
+.field-selector-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-field-action {
+  flex: 1;
+  padding: 6px 12px;
+  background: transparent;
+  color: #4096ff;
+  border: 1px solid #4096ff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-field-action:hover {
+  background: #4096ff;
+  color: white;
+}
+
+.field-selector-list {
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.field-selector-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.field-selector-item:hover {
+  background: #f5f5f5;
+}
+
+.field-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.field-checkbox {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.field-icon {
+  width: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #8c8c8c;
+}
+
+.field-name {
+  flex: 1;
+  font-size: 14px;
+  color: #262626;
+}
+
+.field-count {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #8c8c8c;
+  font-weight: normal;
 }
 
 .header-controls {
@@ -2570,5 +2990,47 @@ export default {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* Searchable Dropdown Styles */
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+
+.searchable-input {
+  width: 100%;
+  padding-right: 30px;
+}
+
+.dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  margin-top: 4px;
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: #f5f5f5;
+}
+
+.dropdown-item:active {
+  background-color: #e8e8e8;
 }
 </style>

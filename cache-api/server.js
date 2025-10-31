@@ -9,6 +9,7 @@ const PORT = 3002;
 const BASEROW_API_URL = 'https://pim.offineeds.com/api/database/rows/table/251/';
 const BASEROW_FIELDS_URL = 'https://pim.offineeds.com/api/database/fields/table/251/';
 const BASEROW_CATEGORIES_URL = 'https://pim.offineeds.com/api/database/rows/table/700/';
+const BASEROW_BRAND_VENDOR_URL = 'https://pim.offineeds.com/api/database/rows/table/732/';
 const BASEROW_TOKEN = '2tLFFPlRQX7cnuvaxTfJ2qVi6aJSecX0';
 const CACHE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const PAGE_SIZE = 200; // Max page size for Baserow API
@@ -18,6 +19,7 @@ let productsCache = {
   data: [],
   fields: [],
   categories: [],
+  brandVendorMapping: [],
   lastUpdated: null,
   isRefreshing: false
 };
@@ -145,6 +147,30 @@ async function fetchCategories() {
   }
 }
 
+// Helper: Fetch brand-vendor mapping
+async function fetchBrandVendorMapping() {
+  try {
+    console.log('🔄 Fetching brand-vendor mapping...');
+    const response = await fetch(`${BASEROW_BRAND_VENDOR_URL}?size=200`, {
+      headers: {
+        'Authorization': `Token ${BASEROW_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Brand-Vendor API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ Fetched ${data.results?.length || 0} brand-vendor mappings`);
+    return data.results || [];
+  } catch (error) {
+    console.error('❌ Error fetching brand-vendor mapping:', error);
+    throw error;
+  }
+}
+
 // Helper: Refresh cache
 async function refreshCache() {
   if (productsCache.isRefreshing) {
@@ -156,15 +182,17 @@ async function refreshCache() {
     productsCache.isRefreshing = true;
     console.log('🔄 Refreshing cache...');
 
-    const [products, fields, categories] = await Promise.all([
+    const [products, fields, categories, brandVendorMapping] = await Promise.all([
       fetchAllProducts(),
       fetchFields(),
-      fetchCategories()
+      fetchCategories(),
+      fetchBrandVendorMapping()
     ]);
 
     productsCache.data = products;
     productsCache.fields = fields;
     productsCache.categories = categories;
+    productsCache.brandVendorMapping = brandVendorMapping;
     productsCache.lastUpdated = new Date();
     productsCache.isRefreshing = false;
 
@@ -172,6 +200,7 @@ async function refreshCache() {
     console.log(`   - Products: ${productsCache.data.length}`);
     console.log(`   - Fields: ${productsCache.fields.length}`);
     console.log(`   - Categories: ${productsCache.categories.length}`);
+    console.log(`   - Brand-Vendor Mappings: ${productsCache.brandVendorMapping.length}`);
   } catch (error) {
     productsCache.isRefreshing = false;
     console.error('❌ Error refreshing cache:', error);
@@ -222,6 +251,16 @@ app.get('/api/categories', (req, res) => {
   res.json({
     results: productsCache.categories,
     count: productsCache.categories.length,
+    cached: true,
+    lastUpdated: productsCache.lastUpdated
+  });
+});
+
+// GET /api/brand-vendor-mapping - Get brand-vendor mapping (instant from cache)
+app.get('/api/brand-vendor-mapping', (req, res) => {
+  res.json({
+    results: productsCache.brandVendorMapping,
+    count: productsCache.brandVendorMapping.length,
     cached: true,
     lastUpdated: productsCache.lastUpdated
   });
@@ -365,6 +404,7 @@ app.get('/api/cache/status', (req, res) => {
     productsCount: productsCache.data.length,
     fieldsCount: productsCache.fields.length,
     categoriesCount: productsCache.categories.length,
+    brandVendorMappingCount: productsCache.brandVendorMapping.length,
     lastUpdated: productsCache.lastUpdated,
     isRefreshing: productsCache.isRefreshing,
     cacheAge: productsCache.lastUpdated
@@ -392,16 +432,17 @@ app.listen(PORT, () => {
 ╚════════════════════════════════════════════╝
 
 Endpoints:
-  GET    /api/products           - Get all products (cached)
-  GET    /api/products/:id       - Get single product
-  POST   /api/products           - Create product
-  PATCH  /api/products/:id       - Update product
-  DELETE /api/products/:id       - Delete product
-  GET    /api/fields             - Get table fields
-  GET    /api/categories         - Get all categories (cached)
-  POST   /api/cache/refresh      - Manually refresh cache
-  GET    /api/cache/status       - Get cache status
-  GET    /health                 - Health check
+  GET    /api/products               - Get all products (cached)
+  GET    /api/products/:id           - Get single product
+  POST   /api/products               - Create product
+  PATCH  /api/products/:id           - Update product
+  DELETE /api/products/:id           - Delete product
+  GET    /api/fields                 - Get table fields
+  GET    /api/categories             - Get all categories (cached)
+  GET    /api/brand-vendor-mapping   - Get brand-vendor mapping (cached)
+  POST   /api/cache/refresh          - Manually refresh cache
+  GET    /api/cache/status           - Get cache status
+  GET    /health                     - Health check
 
 Frontend should connect to: http://localhost:${PORT}
   `);
