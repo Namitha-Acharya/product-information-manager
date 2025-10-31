@@ -17,6 +17,7 @@ def test_get_automation_application(api_client, data_fixture):
     workflow = data_fixture.create_automation_workflow(
         automation=automation, name="test"
     )
+    trigger = workflow.get_trigger()
 
     url = reverse("api:applications:item", kwargs={"application_id": automation.id})
 
@@ -47,8 +48,10 @@ def test_get_automation_application(api_client, data_fixture):
                 "name": "test",
                 "order": 1,
                 "allow_test_run_until": None,
+                "simulate_until_node_id": None,
                 "state": "draft",
                 "published_on": None,
+                "graph": {"0": trigger.id, str(trigger.id): {}},
             }
         ],
     }
@@ -67,6 +70,7 @@ def test_list_automation_applications(api_client, data_fixture):
     workflow = data_fixture.create_automation_workflow(
         automation=automation, name="test"
     )
+    trigger = workflow.get_trigger()
 
     url = reverse("api:applications:list", kwargs={"workspace_id": workspace.id})
 
@@ -98,8 +102,10 @@ def test_list_automation_applications(api_client, data_fixture):
                     "name": "test",
                     "order": 1,
                     "allow_test_run_until": None,
+                    "simulate_until_node_id": None,
                     "state": "draft",
                     "published_on": None,
+                    "graph": {"0": trigger.id, str(trigger.id): {}},
                 }
             ],
         }

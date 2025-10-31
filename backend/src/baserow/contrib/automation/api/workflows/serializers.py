@@ -25,8 +25,10 @@ class AutomationWorkflowSerializer(serializers.ModelSerializer):
             "order",
             "automation_id",
             "allow_test_run_until",
+            "simulate_until_node_id",
             "published_on",
             "state",
+            "graph",
         )
         extra_kwargs = {
             "id": {"read_only": True},

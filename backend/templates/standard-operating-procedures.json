@@ -1,7 +1,7 @@
 {
     "baserow_template_version": 1,
     "name": "Standard Operating Procedures",
-    "icon": "",
+    "icon": "iconoir-cpu",
     "keywords": [
         "SOP",
         "Standard Operating Procedures",
@@ -13,7 +13,8 @@
         "Process Documentation"
     ],
     "categories": [
-        "Business Operations"
+        "Business Operations",
+        "🔥 Most Popular"
     ],
     "open_application": 1566,
     "export": [

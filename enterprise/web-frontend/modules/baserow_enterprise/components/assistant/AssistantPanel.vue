@@ -50,8 +50,9 @@
     </div>
     <div class="assistant__footer">
       <AssistantInputMessage
-        :context-display="workspace.name"
-        :running="isAssistantRunning"
+        :ui-context="uiContext"
+        :is-running="isAssistantRunning"
+        :running-message="assistantRunningMessage"
         @send-message="handleSendMessage"
       ></AssistantInputMessage>
     </div>
@@ -64,6 +65,7 @@ import AssistantInputMessage from '@baserow_enterprise/components/assistant/Assi
 import AssistantMessageList from '@baserow_enterprise/components/assistant/AssistantMessageList'
 import AssistantChatHistoryContext from './AssistantChatHistoryContext'
 import { mapGetters, mapActions } from 'vuex'
+import { waitFor } from '@baserow/modules/core/utils/queue'
 
 export default {
   name: 'AssistantPanel',
@@ -91,6 +93,8 @@ export default {
       currentChat: 'assistant/currentChat',
       chats: 'assistant/chats',
       isLoadingChats: 'assistant/isLoadingChats',
+      uiContext: 'assistant/uiContext',
+      uiLocation: 'assistant/uiLocation',
     }),
     currentChatId() {
       return this.currentChat?.id
@@ -100,6 +104,9 @@ export default {
     },
     isAssistantRunning() {
       return Boolean(this.currentChat?.running)
+    },
+    assistantRunningMessage() {
+      return this.currentChat?.runningMessage || ''
     },
   },
   watch: {
@@ -118,6 +125,50 @@ export default {
           container.scrollTop = container.scrollHeight
         })
       }
+    },
+    uiLocation: {
+      handler(newLocation) {
+        if (!newLocation) return
+
+        if (
+          newLocation.type === 'database-table' ||
+          newLocation.type === 'database-view'
+        ) {
+          const router = this.$router
+          const store = this.$store
+          waitFor(() => {
+            const database = store.getters['application/get'](
+              newLocation.database_id
+            )
+
+            return (
+              database &&
+              database.tables.find(
+                (table) => table.id === newLocation.table_id
+              ) &&
+              (!newLocation.view_id ||
+                store.getters['view/get'](newLocation.view_id) !== undefined)
+            )
+          }).then(() => {
+            router.push({
+              name: 'database-table',
+              params: {
+                workspaceId: this.workspace.id,
+                databaseId: newLocation.database_id,
+                tableId: newLocation.table_id,
+                viewId: newLocation.view_id,
+              },
+            })
+          })
+        } else if (newLocation.type === 'workspace') {
+          this.$router.push({
+            name: 'workspace',
+            params: {
+              workspaceId: this.workspace.id,
+            },
+          })
+        }
+      },
     },
   },
   mounted() {

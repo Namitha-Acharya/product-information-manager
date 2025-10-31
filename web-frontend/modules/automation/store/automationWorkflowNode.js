@@ -1,8 +1,14 @@
 import { uuid } from '@baserow/modules/core/utils/string'
 import AutomationWorkflowNodeService from '@baserow/modules/automation/services/automationWorkflowNode'
 import { NodeEditorSidePanelType } from '@baserow/modules/automation/editorSidePanelTypes'
+import { clone } from '@baserow/modules/core/utils/object'
 
-const state = {}
+import NodeGraphHandler from '@baserow/modules/automation/utils/nodeGraphHandler'
+
+const state = {
+  selectedNodeId: null,
+  draggingNodeId: null,
+}
 
 const updateContext = {
   updateTimeout: null,
@@ -14,7 +20,6 @@ const updateContext = {
 const updateCachedValues = (workflow) => {
   if (!workflow || !workflow.nodes) return
 
-  workflow.orderedNodes = workflow.nodes.sort((a, b) => a.order - b.order)
   workflow.nodeMap = Object.fromEntries(
     workflow.nodes.map((node) => [`${node.id}`, node])
   )
@@ -58,25 +63,24 @@ const mutations = {
     )
     updateCachedValues(workflow)
   },
-  ORDER_ITEMS(state, { workflow, order }) {
-    const updatedNodes = [...workflow.nodes]
-    updatedNodes.forEach((node) => {
-      const index = order.findIndex((value) => value === node.id)
-      node.order = index === -1 ? 0 : index + 1
-    })
-    updatedNodes.sort((a, b) => a.order - b.order)
-    workflow.nodes = updatedNodes
-    updateCachedValues(workflow)
-  },
   SELECT_ITEM(state, { workflow, node }) {
     workflow.selectedNodeId = node?.id || null
   },
   SET_LOADING(state, { node, value }) {
     node._.loading = value
   },
+  SET_DRAGGING_NODE_ID(state, nodeId) {
+    state.draggingNodeId = nodeId
+  },
 }
 
 const actions = {
+  forceCreate({ commit, getters, dispatch }, { workflow, node }) {
+    if (!workflow) return
+
+    // Add the new node into the workflow
+    commit('ADD_ITEM', { workflow, node })
+  },
   async fetch({ commit }, { workflow }) {
     if (!workflow) return []
 
@@ -91,71 +95,110 @@ const actions = {
     commit('SET_ITEMS', { workflow, nodes })
     return nodes
   },
+  async graphInsert(
+    { commit, dispatch, getters },
+    { workflow, node, referenceNode, position, output }
+  ) {
+    const graphHandler = new NodeGraphHandler(workflow)
+    graphHandler.insert(node, referenceNode, position, output)
+
+    await dispatch(
+      'automationWorkflow/forceUpdate',
+      {
+        workflow,
+        values: { graph: graphHandler.graph },
+      },
+      { root: true }
+    )
+  },
+  async graphRemove({ commit, dispatch, getters }, { workflow, node }) {
+    const graphHandler = new NodeGraphHandler(workflow)
+    graphHandler.remove(node)
+
+    await dispatch(
+      'automationWorkflow/forceUpdate',
+      {
+        workflow,
+        values: { graph: graphHandler.graph },
+      },
+      { root: true }
+    )
+  },
+  async graphMove(
+    { commit, dispatch, getters },
+    { workflow, nodeToMove, referenceNode, position, output }
+  ) {
+    const graphHandler = new NodeGraphHandler(workflow)
+    graphHandler.move(nodeToMove, referenceNode, position, output)
+
+    await dispatch(
+      'automationWorkflow/forceUpdate',
+      {
+        workflow,
+        values: { graph: graphHandler.graph },
+      },
+      { root: true }
+    )
+  },
+  async graphReplace(
+    { commit, dispatch, getters },
+    { workflow, nodeToReplace, newNode }
+  ) {
+    const graphHandler = new NodeGraphHandler(workflow)
+    graphHandler.replace(nodeToReplace, newNode)
+
+    await dispatch(
+      'automationWorkflow/forceUpdate',
+      {
+        workflow,
+        values: { graph: graphHandler.graph },
+      },
+      { root: true }
+    )
+  },
   async create(
     { commit, dispatch, getters },
-    { workflow, type, previousNodeId = null, previousNodeOutput = null }
+    { workflow, type, referenceNode, position, output }
   ) {
     // Using the `previousNodeId` and `previousNodeOutput` to determine
     // what the `beforeId` should be. We will have `beforeId` if we're
     // creating a node after `previousNodeId`, and `previousNodeId` has
     // a node that follows it.
     const nodeType = this.$registry.get('node', type)
-    const previousNode = getters.findById(workflow, previousNodeId)
-    const nextNodes = getters.getNextNodes(
-      workflow,
-      previousNode,
-      previousNodeOutput
-    )
-
-    const beforeNode = nextNodes.length > 0 ? nextNodes[0] : null
-    const beforeId = beforeNode?.id || null
-    const beforeOldValues = beforeNode
-      ? {
-          previous_node_id: beforeNode.previous_node_id,
-          previous_node_output: beforeNode.previous_node_output,
-        }
-      : {}
 
     // Apply optimistic create
     const tempNode = nodeType.getDefaultValues({
       id: uuid(),
       type,
-      previous_node_id: previousNodeId,
-      previous_node_output: previousNodeOutput,
       workflow: workflow.id,
     })
     commit('ADD_ITEM', { workflow, node: tempNode })
 
-    // Apply optimistic beforeNode update.
-    if (beforeNode) {
-      commit('UPDATE_ITEM', {
-        workflow,
-        node: beforeNode,
-        values: { previous_node_id: tempNode.id, previous_node_output: '' },
-      })
-    }
+    const initialGraph = clone(workflow.graph)
+
+    dispatch('graphInsert', {
+      workflow,
+      node: tempNode,
+      referenceNode,
+      position,
+      output,
+    })
 
     try {
       const { data: node } = await AutomationWorkflowNodeService(
         this.$client
-      ).create(workflow.id, type, beforeId, previousNodeId, previousNodeOutput)
+      ).create(workflow.id, type, referenceNode, position, output)
+
+      commit('ADD_ITEM', { workflow, node })
+
+      await dispatch('graphReplace', {
+        workflow,
+        nodeToReplace: tempNode,
+        newNode: node,
+      })
 
       // Remove temp node and add real one
       commit('DELETE_ITEM', { workflow, nodeId: tempNode.id })
-      commit('ADD_ITEM', { workflow, node })
-
-      // If we have a `beforeNode`, we need to update its `previous_node_id`
-      // and `previous_node_output`. The former so that it points to our newly
-      // created node, and the latter so that it has a blank output.
-      // This all happens in the backend, but we need the store to reflect the
-      // change immediately.
-      if (beforeNode) {
-        commit('UPDATE_ITEM', {
-          workflow,
-          node: beforeNode,
-          values: { previous_node_id: node.id, previous_node_output: '' },
-        })
-      }
 
       setTimeout(() => {
         const populatedNode = getters.findById(workflow, node.id)
@@ -165,15 +208,16 @@ const actions = {
       return node
     } catch (error) {
       // If API fails, remove the temporary node
-      commit('DELETE_ITEM', { workflow, nodeId: tempNode.id })
-      // And restore the previous `beforeNode` values.
-      if (beforeNode) {
-        commit('UPDATE_ITEM', {
+      await dispatch(
+        'automationWorkflow/forceUpdate',
+        {
           workflow,
-          node: beforeNode,
-          values: beforeOldValues,
-        })
-      }
+          values: { graph: initialGraph },
+        },
+        { root: true }
+      )
+      commit('DELETE_ITEM', { workflow, nodeId: tempNode.id })
+
       throw error
     }
   },
@@ -261,73 +305,105 @@ const actions = {
       updateContext.promiseResolve = resolve
     })
   },
-  async delete({ commit, dispatch, getters }, { workflow, nodeId }) {
+  forceDelete({ commit, dispatch, getters }, { workflow, nodeId }) {
     const node = getters.findById(workflow, nodeId)
-    // Note that when we fetch the next node, we don't pass in the output,
-    // this is because the next node in that scenario *won't have* an output.
+    if (!node) return
+
     const nextNodes = getters.getNextNodes(workflow, node)
     const nextNode = nextNodes.length > 0 ? nextNodes[0] : null
-    const originalNode = { ...node }
+
     if (getters.getSelected(workflow)?.id === nodeId) {
       dispatch('select', { workflow, node: null })
+      if (nextNode) {
+        dispatch('select', { workflow, node: nextNode })
+      }
     }
-    // If we have a node after the one we're deleting, we need to update its
-    // `previous_node_id` and `previous_node_output` to point to the node
-    // we're deleting.
-    if (nextNode) {
-      commit('UPDATE_ITEM', {
-        workflow,
-        node: nextNode,
-        values: {
-          previous_node_id: node.previous_node_id,
-          previous_node_output: node.previous_node_output,
-        },
-      })
-      dispatch('select', { workflow, node: nextNode })
-    }
+
+    commit('DELETE_ITEM', { workflow, nodeId })
+  },
+  async delete({ commit, dispatch, getters }, { workflow, nodeId }) {
+    const node = getters.findById(workflow, nodeId)
+    const originalNode = clone(node)
+
+    const initialGraph = clone(workflow.graph)
+    await dispatch('graphRemove', {
+      workflow,
+      node,
+    })
+
     commit('DELETE_ITEM', { workflow, nodeId })
     try {
       await AutomationWorkflowNodeService(this.$client).delete(nodeId)
     } catch (error) {
+      // We restore the removed node
       commit('ADD_ITEM', { workflow, node: originalNode })
+      await dispatch(
+        'automationWorkflow/forceUpdate',
+        {
+          workflow,
+          values: { graph: initialGraph },
+        },
+        { root: true }
+      )
       throw error
     }
   },
   async replace({ commit, dispatch, getters }, { workflow, nodeId, newType }) {
-    const node = getters.findById(workflow, nodeId)
-    const nextNodes = getters.getNextNodes(workflow, node)
-    const nextNode = nextNodes.length > 0 ? nextNodes[0] : null
+    const nodeToReplace = getters.findById(workflow, nodeId)
 
     const { data: newNode } = await AutomationWorkflowNodeService(
       this.$client
     ).replace(nodeId, {
       new_type: newType,
     })
-    commit('DELETE_ITEM', { workflow, nodeId })
+
     commit('ADD_ITEM', { workflow, node: newNode })
 
-    // If the node that we replaced had a node after it, we need to update
-    // its `previous_node_id` to point to the new node ID.
-    if (nextNode) {
-      commit('UPDATE_ITEM', {
-        workflow,
-        node: nextNode,
-        values: { previous_node_id: newNode.id },
-      })
-    }
+    await dispatch('graphReplace', {
+      workflow,
+      nodeToReplace,
+      newNode,
+    })
+
+    commit('DELETE_ITEM', { workflow, nodeId })
+
     setTimeout(() => {
       dispatch('select', { workflow, node: newNode })
     })
   },
-  async order({ commit }, { workflow, order, oldOrder }) {
-    commit('ORDER_ITEMS', { workflow, order })
+  async move({ commit, dispatch, getters }, { workflow, moveData }) {
+    const { movedNodeId, referenceNodeId, position, output } = moveData
+    const movedNode = getters.findById(workflow, movedNodeId)
+    const referenceNode = getters.findById(workflow, referenceNodeId)
+
+    const [previousReferenceNode, previousPosition, previousOutput] =
+      new NodeGraphHandler(workflow).getNodePosition(movedNode)
+
+    dispatch('graphMove', {
+      workflow,
+      nodeToMove: movedNode,
+      referenceNode,
+      position,
+      output,
+    })
+
     try {
-      await AutomationWorkflowNodeService(this.$client).order(
-        workflow.id,
-        order
-      )
+      // Perform the backend update.
+      await AutomationWorkflowNodeService(this.$client).move(movedNodeId, {
+        reference_node_id: referenceNodeId,
+        position,
+        output,
+      })
     } catch (error) {
-      commit('ORDER_ITEMS', { workflow, order: oldOrder })
+      // We revert the operation
+      dispatch('graphMove', {
+        workflow,
+        nodeToMove: movedNode,
+        referenceNode: previousReferenceNode,
+        position: previousPosition,
+        output: previousOutput,
+      })
+
       throw error
     }
   },
@@ -339,14 +415,67 @@ const actions = {
       { root: true }
     )
   },
+  setDraggingNodeId({ commit }, nodeId) {
+    commit('SET_DRAGGING_NODE_ID', nodeId)
+  },
+  async simulateDispatch({ commit, dispatch }, { nodeId }) {
+    await AutomationWorkflowNodeService(this.$client).simulateDispatch(nodeId)
+  },
+  /**
+   * Updates all the next nodes of a given node with the provided values.
+   * This used when a node is replaced, or moved, as the next nodes need to
+   * be updated to reflect the new previous node id and output.
+   */
+  _updateNextNodesValues(
+    { commit, getters },
+    { workflow, nodeId, valuesToUpdate, outputUid = null, parentNodeId = null }
+  ) {
+    const node = getters.findById(workflow, nodeId)
+    const nextNodes = getters.getNextNodes(workflow, node, outputUid)
+    nextNodes.forEach((nextNode) => {
+      commit('UPDATE_ITEM', {
+        workflow,
+        node: nextNode,
+        values: valuesToUpdate,
+      })
+    })
+  },
+  /**
+   * Updates all the next nodes of a given node with the provided values.
+   * This used when a node is replaced, or moved, as the next nodes need to
+   * be updated to reflect the new previous node id and output.
+   */
+  updateNextNodesValues(
+    { commit, getters },
+    {
+      workflow,
+      nodeId = null,
+      parentNodeId = null,
+      valuesToUpdate,
+      outputUid = null,
+    }
+  ) {
+    let nextNodes
+    if (nodeId) {
+      const node = getters.findById(workflow, nodeId)
+      nextNodes = getters.getNextNodes(workflow, node, outputUid)
+    } else {
+      const parentNode = getters.findById(workflow, parentNodeId)
+      nextNodes = getters.getChildren(workflow, parentNode)
+    }
+    nextNodes.forEach((nextNode) => {
+      commit('UPDATE_ITEM', {
+        workflow,
+        node: nextNode,
+        values: valuesToUpdate,
+      })
+    })
+  },
 }
 
 const getters = {
   getNodes: (state) => (workflow) => {
     return workflow.nodes
-  },
-  getNodesOrdered: (state) => (workflow) => {
-    return workflow.orderedNodes
   },
   findById: (state) => (workflow, nodeId) => {
     if (!workflow || !workflow.nodes || !nodeId) return null
@@ -363,41 +492,51 @@ const getters = {
   getLoading: (state) => (node) => {
     return node._.loading
   },
+  getDraggingNodeId(state) {
+    return state.draggingNodeId
+  },
+  /**
+   * Returns the immediate children of the given targetNode. For now we support only
+   * one child but may be later we can support more.
+   */
+  getChildren: (state, getters) => (workflow, targetNode) => {
+    return new NodeGraphHandler(workflow).getChildren(targetNode)
+  },
   getNextNodes:
     (state, getters) =>
     (workflow, targetNode, outputUid = null) => {
-      const nodes = getters.getNodesOrdered(workflow)
-      const nextNodes = nodes.filter(
-        (node) => node.previous_node_id === targetNode.id
-      )
-      if (outputUid !== null) {
-        return nextNodes.filter(
-          (node) => node.previous_node_output === outputUid
-        )
-      }
-      return nextNodes
+      return new NodeGraphHandler(workflow).getNextNodes(targetNode, outputUid)
     },
-  getPreviousNode: (state, getters) => (workflow, node) => {
-    return getters.findById(workflow, node?.previous_node_id)
+  getAncestors: (state, getters) => (workflow, targetNode) => {
+    const positions = new NodeGraphHandler(workflow).getPreviousPositions(
+      targetNode
+    )
+
+    const parentNodes = positions
+      .filter(([, position]) => position === 'child')
+      .map(([prevNode]) => prevNode)
+
+    return parentNodes
   },
   getPreviousNodes:
     (state, getters) =>
     (
       workflow,
       targetNode,
-      { targetFirst = false, includeSelf = false } = {}
+      { targetFirst = false, includeSelf = false, predicate = () => true } = {}
     ) => {
-      const getPreviousForNode = (node) => {
-        const previousNode = getters.getPreviousNode(workflow, node)
-        if (previousNode) {
-          return [...getPreviousForNode(previousNode), previousNode]
-        } else {
-          return []
-        }
-      }
+      const positions = new NodeGraphHandler(workflow).getPreviousPositions(
+        targetNode
+      )
+
+      const previousNodes = positions
+        .filter((position) => predicate(...position))
+        .map(([prevNode]) => prevNode)
+        .filter((node) => node)
+
       const previous = includeSelf
-        ? [...getPreviousForNode(targetNode), targetNode]
-        : getPreviousForNode(targetNode)
+        ? [...previousNodes, targetNode]
+        : previousNodes
       return targetFirst ? previous.reverse() : previous
     },
 }

@@ -2,10 +2,14 @@
   <FormulaInputField
     v-bind="$attrs"
     required
+    enable-advanced-mode
+    :value="formulaStr"
+    :mode="formulaMode"
     :data-explorer-loading="dataExplorerLoading"
     :data-providers="dataProviders"
     :application-context="applicationContext"
-    v-on="$listeners"
+    @input="updatedFormulaStr"
+    @mode-changed="updateMode"
   />
 </template>
 
@@ -30,6 +34,11 @@ export default {
     },
   },
   props: {
+    value: {
+      type: Object,
+      required: false,
+      default: () => ({}),
+    },
     dataProvidersAllowed: {
       type: Array,
       required: false,
@@ -37,6 +46,17 @@ export default {
     },
   },
   computed: {
+    /**
+     * Extract the formula string from the value object, the FormulaInputField
+     * component only needs the formula string itself.
+     * @returns {String} The formula string.
+     */
+    formulaStr() {
+      return this.value.formula
+    },
+    formulaMode() {
+      return this.value.mode
+    },
     dataSourceLoading() {
       return this.$store.getters['dataSource/getLoading'](this.elementPage)
     },
@@ -66,6 +86,19 @@ export default {
       return this.dataProvidersAllowed.some(
         (dataProviderName) => this.dataProviderLoadingMap[dataProviderName]
       )
+    },
+  },
+  methods: {
+    /**
+     * When `FormulaInputField` emits a new formula string, we need to emit the
+     * entire value object with the updated formula string.
+     * @param {String} newFormulaStr The new formula string.
+     */
+    updatedFormulaStr(newFormulaStr) {
+      this.$emit('input', { ...this.value, formula: newFormulaStr })
+    },
+    updateMode(newMode) {
+      this.$emit('input', { ...this.value, mode: newMode })
     },
   },
 }

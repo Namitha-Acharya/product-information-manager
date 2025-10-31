@@ -196,6 +196,7 @@ x-backend-variables:
   SENTRY_DSN:
   SENTRY_BACKEND_DSN:
   OPENAI_API_KEY:
+  GROQ_API_KEY:
   BASEROW_OPENAI_API_KEY:
   BASEROW_OPENAI_ORGANIZATION:
   BASEROW_OPENAI_MODELS:
@@ -230,6 +231,9 @@ x-backend-variables:
   BASEROW_DEADLOCK_MAX_RETRIES:
   BASEROW_PREMIUM_GROUPED_AGGREGATE_SERVICE_MAX_SERIES:
   BASEROW_PREMIUM_GROUPED_AGGREGATE_SERVICE_MAX_AGG_BUCKETS:
+  BASEROW_ENTERPRISE_ASSISTANT_LLM_MODEL:
+  BASEROW_EMBEDDINGS_API_URL:
+  
 
 services:
   # A caddy reverse proxy sitting in-front of all the services. Responsible for routing
@@ -256,7 +260,7 @@ services:
       local:
 
   backend:
-    image: baserow/backend:1.35.1
+    image: baserow/backend:1.35.3
     restart: unless-stopped
 
     environment:
@@ -270,7 +274,7 @@ services:
       local:
 
   web-frontend:
-    image: baserow/web-frontend:1.35.1
+    image: baserow/web-frontend:1.35.3
     restart: unless-stopped
     environment:
       BASEROW_PUBLIC_URL: ${BASEROW_PUBLIC_URL-http://localhost}
@@ -314,7 +318,7 @@ services:
       local:
 
   celery:
-    image: baserow/backend:1.35.1
+    image: baserow/backend:1.35.3
     restart: unless-stopped
     environment:
       <<: *backend-variables
@@ -335,7 +339,7 @@ services:
       local:
 
   celery-export-worker:
-    image: baserow/backend:1.35.1
+    image: baserow/backend:1.35.3
     restart: unless-stopped
     command: celery-exportworker
     environment:
@@ -356,7 +360,7 @@ services:
       local:
 
   celery-beat-worker:
-    image: baserow/backend:1.35.1
+    image: baserow/backend:1.35.3
     restart: unless-stopped
     command: celery-beat
     environment:
@@ -371,7 +375,7 @@ services:
       local:
 
   db:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     # If you were using a previous version, perform the update by uncommenting the
     # following line. See: https://baserow.io/docs/installation%2Finstall-with-docker#upgrading-postgresql-database-from-a-previous-version
     # for more information.

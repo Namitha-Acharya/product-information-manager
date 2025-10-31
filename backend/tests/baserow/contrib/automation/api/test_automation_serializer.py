@@ -41,6 +41,7 @@ def test_serializer_has_expected_fields(automation_fixture):
 def test_serializer_get_workflows(automation_fixture):
     automation = automation_fixture["automation"]
     workflow = automation_fixture["workflow"]
+    trigger = workflow.get_trigger()
 
     serializer = AutomationSerializer(instance=automation)
 
@@ -53,6 +54,8 @@ def test_serializer_get_workflows(automation_fixture):
             "automation_id": automation.id,
             "allow_test_run_until": None,
             "state": "draft",
+            "simulate_until_node_id": None,
             "published_on": None,
+            "graph": {"0": trigger.id, str(trigger.id): {}},
         }
     ]

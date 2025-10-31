@@ -1,5 +1,9 @@
+from uuid import uuid4
+
 from baserow.contrib.integrations.core.models import (
     CoreHTTPRequestService,
+    CoreHTTPTriggerService,
+    CoreIteratorService,
     CoreRouterService,
     CoreSMTPEmailService,
 )
@@ -96,28 +100,44 @@ class ServiceFixtures:
         service = self.create_service(CoreSMTPEmailService, **kwargs)
         return service
 
+    def create_core_iterator_service(self, **kwargs):
+        return self.create_service(CoreIteratorService, **kwargs)
+
     def create_core_router_service(self, **kwargs):
         return self.create_service(CoreRouterService, **kwargs)
 
     def create_core_router_service_edge(self, service: CoreRouterService, **kwargs):
         output_node = kwargs.pop("output_node", None)
         skip_output_node = kwargs.pop("skip_output_node", False)
+        edge_label = kwargs.get("label", "Edge")
+        output_label = kwargs.pop("output_label", f"{edge_label} output node")
+
         edge = service.edges.create(**kwargs)
+
         if output_node is None and not skip_output_node:
             router_node = service.automation_workflow_node
             self.create_local_baserow_create_row_action_node(
-                previous_node_output=edge.uid,
-                previous_node_id=router_node.id,
+                reference_node=router_node,
+                output=edge.uid,
+                position="south",
                 workflow=router_node.workflow,
+                label=output_label,
             )
+
         return edge
+
+    def create_core_http_trigger_service(self, **kwargs) -> CoreSMTPEmailService:
+        if "uid" not in kwargs:
+            kwargs["uid"] = uuid4()
+
+        return self.create_service(CoreHTTPTriggerService, **kwargs)
 
     def create_service(self, model_class, **kwargs):
         if "integration" not in kwargs:
             integration = None
+            integrations_args = kwargs.pop("integration_args", {})
             service_type = service_type_registry.get_by_model(model_class)
             if service_type.get_integration_type():
-                integrations_args = kwargs.pop("integration_args", {})
                 integration = self.create_integration(
                     service_type.get_integration_type().model_class, **integrations_args
                 )

@@ -26,6 +26,10 @@
           <span class="tree__link-text">{{
             $t('assistantSidebarItem.title')
           }}</span>
+          <i
+            v-show="rightSidebarOpen"
+            class="tree__icon-right iconoir-view-columns-3"
+          ></i>
         </a>
       </div>
       <PaidFeaturesModal
@@ -48,6 +52,11 @@ export default {
     workspace: {
       type: Object,
       required: true,
+    },
+    rightSidebarOpen: {
+      type: Boolean,
+      required: false,
+      default: false,
     },
   },
   computed: {

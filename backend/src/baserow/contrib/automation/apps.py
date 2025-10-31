@@ -15,12 +15,15 @@ class AutomationConfig(AppConfig):
             CreateAutomationNodeActionType,
             DeleteAutomationNodeActionType,
             DuplicateAutomationNodeActionType,
-            OrderAutomationNodesActionType,
+            MoveAutomationNodeActionType,
             ReplaceAutomationNodeActionType,
             UpdateAutomationNodeActionType,
         )
         from baserow.contrib.automation.nodes.node_types import (
             CoreHttpRequestNodeType,
+            CoreHTTPTriggerNodeType,
+            CoreIteratorNodeType,
+            CorePeriodicTriggerNodeType,
             CoreRouterActionNodeType,
             CoreSMTPEmailNodeType,
             LocalBaserowAggregateRowsNodeType,
@@ -47,6 +50,7 @@ class AutomationConfig(AppConfig):
             UpdateAutomationNodeOperationType,
         )
         from baserow.contrib.automation.nodes.registries import (
+            ReplaceAutomationNodeTrashOperationType,
             automation_node_type_registry,
         )
         from baserow.contrib.automation.nodes.trash_types import (
@@ -136,9 +140,9 @@ class AutomationConfig(AppConfig):
             action_type_registry.register(CreateAutomationNodeActionType())
             action_type_registry.register(UpdateAutomationNodeActionType())
             action_type_registry.register(DeleteAutomationNodeActionType())
-            action_type_registry.register(OrderAutomationNodesActionType())
             action_type_registry.register(DuplicateAutomationNodeActionType())
             action_type_registry.register(ReplaceAutomationNodeActionType())
+            action_type_registry.register(MoveAutomationNodeActionType())
 
             action_scope_registry.register(WorkflowActionScopeType())
 
@@ -149,6 +153,7 @@ class AutomationConfig(AppConfig):
             automation_node_type_registry.register(LocalBaserowListRowsNodeType())
             automation_node_type_registry.register(LocalBaserowAggregateRowsNodeType())
             automation_node_type_registry.register(CoreHttpRequestNodeType())
+            automation_node_type_registry.register(CoreIteratorNodeType())
             automation_node_type_registry.register(CoreSMTPEmailNodeType())
             automation_node_type_registry.register(CoreRouterActionNodeType())
             automation_node_type_registry.register(
@@ -160,8 +165,17 @@ class AutomationConfig(AppConfig):
             automation_node_type_registry.register(
                 LocalBaserowRowsDeletedNodeTriggerType()
             )
+            automation_node_type_registry.register(CorePeriodicTriggerNodeType())
+            automation_node_type_registry.register(CoreHTTPTriggerNodeType())
+
+            from baserow.core.trash.registries import trash_operation_type_registry
+
+            trash_operation_type_registry.register(
+                ReplaceAutomationNodeTrashOperationType()
+            )
 
             from baserow.contrib.automation.data_providers.data_provider_types import (
+                CurrentIterationDataProviderType,
                 PreviousNodeProviderType,
             )
             from baserow.contrib.automation.data_providers.registries import (
@@ -169,6 +183,9 @@ class AutomationConfig(AppConfig):
             )
 
             automation_data_provider_type_registry.register(PreviousNodeProviderType())
+            automation_data_provider_type_registry.register(
+                CurrentIterationDataProviderType()
+            )
 
             from baserow.contrib.automation.nodes.permission_manager import (
                 AutomationNodePermissionManager,
@@ -188,8 +205,15 @@ class AutomationConfig(AppConfig):
             import baserow.contrib.automation.nodes.ws.signals  # noqa: F403, F401
             import baserow.contrib.automation.workflows.signals  # noqa: F403, F401
             import baserow.contrib.automation.workflows.ws.signals  # noqa: F403, F401
+            import baserow.contrib.integrations.tasks  # noqa: F403, F401
             from baserow.contrib.automation.nodes.receivers import (
                 connect_to_node_pre_delete_signal,
             )
 
             connect_to_node_pre_delete_signal()
+
+        from baserow.core.search.registries import workspace_search_registry
+
+        from .search_types import AutomationSearchType
+
+        workspace_search_registry.register(AutomationSearchType())

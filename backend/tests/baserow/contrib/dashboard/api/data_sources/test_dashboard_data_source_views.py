@@ -50,10 +50,11 @@ def test_get_dashboard_data_sources(api_client, data_fixture):
         "name": "Name 1",
         "order": "1.00000000000000000000",
         "schema": None,
-        "search_query": "",
+        "search_query": {"formula": "", "mode": "simple", "version": "0.1"},
         "table_id": None,
         "type": "local_baserow_aggregate_rows",
         "view_id": None,
+        "sample_data": None,
     }
     assert response_json[1] == {
         "context_data": None,
@@ -68,10 +69,11 @@ def test_get_dashboard_data_sources(api_client, data_fixture):
         "name": "Name 2",
         "order": "2.00000000000000000000",
         "schema": None,
-        "search_query": "",
+        "search_query": {"formula": "", "mode": "simple", "version": "0.1"},
         "table_id": None,
         "type": "local_baserow_list_rows",
         "view_id": None,
+        "sample_data": None,
     }
 
 

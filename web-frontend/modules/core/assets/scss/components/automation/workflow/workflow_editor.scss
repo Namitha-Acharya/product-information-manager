@@ -1,51 +1,4 @@
-.workflow-editor__node {
-  display: inline-flex;
-  height: 72px;
-  padding: 16px;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-  width: 412px;
-  border: 1.5px solid $palette-neutral-200;
-  background: $white;
-  cursor: pointer;
-
-  @include elevation($elevation-low);
-  @include rounded($rounded-xl);
-}
-
-.workflow-editor__node::before {
-  content: attr(data-before-label);
-  position: absolute;
-  top: -25px;
-  left: 0;
-  color: $palette-neutral-900;
-  font-weight: 500;
-}
-
-.workflow-editor__node-more--wrapper {
-  display: flex;
-  margin-left: auto;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.workflow-editor__node-more-icon {
-  color: $palette-neutral-800;
-  font-size: 20px;
-  width: 25px;
-  height: 25px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-
-  @include rounded($rounded-md);
-
-  &:hover {
-    background-color: $palette-neutral-100;
-  }
-}
+$connectorHeight: 32px;
 
 .workflow-editor {
   .vue-flow__controls {
@@ -58,38 +11,24 @@
     border: none;
     border-right: 1px solid #eee;
   }
-
-  .vue-flow__node-workflow-node {
-    &.selected {
-      .workflow-editor__node {
-        border: 1.5px solid $palette-blue-500;
-      }
-    }
-  }
 }
 
-.workflow-editor__node-icon {
-  display: flex;
-  height: 40px;
-  padding: 12px;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid $palette-neutral-200;
+.workflow-editor__trigger-selector {
+  background: $white;
+  border: 1.5px solid $palette-neutral-200;
 
   @include elevation($elevation-low);
-  @include rounded($rounded-md);
+  @include rounded($rounded-xl);
 }
 
-.workflow-editor__node-title {
+.workflow-editor__trigger-selector-title {
   font-size: 16px;
   font-weight: 500;
   color: $palette-neutral-1200;
-  min-width: 0;
+  text-align: center;
+  padding-top: 20px;
+}
 
-  &:last-child {
-    margin-bottom: 30px;
-  }
-
-  @extend %ellipsis;
+.workflow-connector {
+  color: $palette-neutral-400;
 }

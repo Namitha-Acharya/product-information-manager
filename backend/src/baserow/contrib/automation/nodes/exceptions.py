@@ -29,24 +29,32 @@ class AutomationNodeDoesNotExist(AutomationNodeError):
         )
 
 
-class AutomationNodeBeforeInvalid(Exception):
+class AutomationNodeNotFoundInGraph(AutomationNodeError):
     """
-    Raised when trying to create an automation node `before` another, but it is invalid.
-    This can happen if the `before` is a trigger, or if `before.workflow` belongs to a
-    different workflow to the one supplied.
+    Raised when we try to access a node that doesn't exist in the graph.
     """
+
+
+class AutomationNodeReferenceNodeInvalid(AutomationNodeError):
+    """
+    Raised when trying to use an invalid reference node.
+    """
+
+
+class AutomationNodeTriggerAlreadyExists(AutomationNodeError):
+    """When we try to create a trigger node when it already exists"""
+
+
+class AutomationNodeFirstNodeMustBeTrigger(AutomationNodeError):
+    """When we try to create a non trigger node as first node of the graph"""
+
+
+class AutomationNodeTriggerMustBeFirstNode(AutomationNodeError):
+    """When we try to create a trigger node as non first node of the graph"""
 
 
 class AutomationNodeMisconfiguredService(AutomationNodeError):
     """When the node's service is misconfigured."""
-
-
-class AutomationTriggerModificationDisallowed(AutomationNodeError):
-    """
-    Raised when trying to create, delete or duplicate a trigger node. There can only
-    be one trigger node per workflow, and it is created automatically when the workflow
-    is created. Users can only change the trigger node type, not create a new one.
-    """
 
 
 class AutomationNodeNotDeletable(AutomationNodeError):
@@ -61,4 +69,21 @@ class AutomationNodeNotReplaceable(AutomationNodeError):
     Raised when an automation node is not replaceable. This can happen if
     the node's type dictates that it cannot be replaced, or if a trigger
     is being replaced with an action, or vice versa.
+    """
+
+
+class AutomationNodeSimulateDispatchError(AutomationNodeError):
+    """Raised when there is an error while simulating a dispatch of a node."""
+
+
+class AutomationNodeNotMovable(AutomationNodeError):
+    """
+    Raised when an automation node is not movable. This can happen if
+    the node's type dictates that it cannot be moved due to its state.
+    """
+
+
+class AutomationNodeMissingOutput(AutomationNodeError):
+    """
+    Raised when the target output is missing in the reference node.
     """

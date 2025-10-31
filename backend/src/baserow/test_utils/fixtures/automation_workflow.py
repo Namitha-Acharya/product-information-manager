@@ -15,6 +15,9 @@ class AutomationWorkflowFixtures:
         ][0]
         trigger_type = kwargs.pop("trigger_type", first_trigger_type)
 
+        if isinstance(trigger_type, str):
+            trigger_type = automation_node_type_registry.get(trigger_type)
+
         # Pluck out any values we need later for the trigger's service.
         trigger_service_kwargs = kwargs.pop("trigger_service_kwargs", {})
 
@@ -44,7 +47,12 @@ class AutomationWorkflowFixtures:
                 service_type.model_class, **trigger_service_kwargs
             )
             self.create_automation_node(
-                workflow=workflow, type=trigger_type.type, service=service
+                workflow=workflow,
+                type=trigger_type.type,
+                service=service,
+                reference_node_id=None,
+                position="south",
+                output="",
             )
 
         return workflow

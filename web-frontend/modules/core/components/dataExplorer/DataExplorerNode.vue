@@ -18,6 +18,13 @@
         v-if="isSelected"
         class="data-explorer-node__content-selected-icon iconoir-check-circle"
       />
+      <span
+        v-else-if="allowNodeSelection && node.type === 'array'"
+        class="data-explorer-node__select-node"
+        @click.stop="handleClick(node, true)"
+      >
+        {{ $t('dataExplorerNode.selectNode') }}
+      </span>
     </div>
     <div v-if="isNodeOpen" ref="nodes" class="data-explorer-node__children">
       <template v-if="node.type !== 'array'">
@@ -28,9 +35,14 @@
           :depth="depth + 1"
           :open-nodes="openNodes"
           :node-selected="nodeSelected"
-          :path="`${path}.${subNode.identifier}`"
-          :search-path="`${searchPath}.${subNode.identifier}`"
+          :path="subNode.identifier ? `${path}.${subNode.identifier}` : path"
+          :search-path="
+            subNode.identifier
+              ? `${searchPath}.${subNode.identifier}`
+              : searchPath
+          "
           :search="search"
+          :allow-node-selection="allowNodeSelection"
           @click="$emit('click', $event)"
           @toggle="$emit('toggle', $event)"
         />
@@ -43,6 +55,7 @@
           :depth="depth + 1"
           :open-nodes="openNodes"
           :node-selected="nodeSelected"
+          :allow-node-selection="allowNodeSelection"
           :search="search"
           :path="`${path}.${subNode.identifier}`"
           :search-path="`${searchPath}.__any__`"
@@ -97,6 +110,11 @@ export default {
       type: String,
       required: false,
       default: null,
+    },
+    allowNodeSelection: {
+      type: Boolean,
+      required: false,
+      default: false,
     },
   },
   data() {
@@ -197,12 +215,12 @@ export default {
     },
   },
   methods: {
-    handleClick(node) {
+    handleClick(node, isNode) {
       if (this.depth < 1) {
         // We don't want to click on first level
         return
       }
-      if (this.hasChildren) {
+      if (this.hasChildren && !isNode) {
         if (this.search === null) {
           this.$emit('toggle', this.path)
         }

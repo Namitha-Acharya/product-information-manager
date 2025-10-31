@@ -2,6 +2,7 @@ import json
 import re
 from datetime import date, datetime
 from decimal import Decimal
+from json.decoder import JSONDecodeError
 from typing import Any, List, Optional, Union
 
 from django.core.exceptions import ValidationError
@@ -14,11 +15,12 @@ from baserow.contrib.database.fields.constants import (
 from baserow.core.datetime import FormattedDate, FormattedDateTime
 
 
-def ensure_boolean(value: Any) -> bool:
+def ensure_boolean(value: Any, strict=True) -> bool:
     """
     Ensures that the value is a boolean or converts it.
 
     :param value: The value to ensure as a boolean.
+    :param strict: If not strict, an attempt is made to cast the value to a bool.
     :return: The value as a boolean.
     :raises ValidationError: if the value is not a valid boolean or convertible to a
         boolean.
@@ -28,6 +30,9 @@ def ensure_boolean(value: Any) -> bool:
         return True
     elif value in BASEROW_BOOLEAN_FIELD_FALSE_VALUES:
         return False
+
+    if not strict:
+        return bool(value)
 
     raise ValidationError("Value is not a valid boolean or convertible to a boolean.")
 
@@ -211,3 +216,24 @@ def ensure_datetime(value: Any) -> Optional[datetime]:
         return FormattedDateTime(value).datetime if value is not None else None
     except (ValueError, TypeError) as exc:
         raise ValidationError("Value cannot be converted to a datetime.") from exc
+
+
+def ensure_object(value: Any) -> Optional[dict]:
+    """
+    Ensures that the value is a dict or can be converted to a dict.
+    :param value: The value to ensure as a dict.
+    :return: The value as a dict.
+    :raises ValidationError: If the value is not a valid dict or convertible to a
+        dict.
+    """
+
+    if isinstance(value, dict):
+        return value
+
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (TypeError, JSONDecodeError) as exc:
+            raise ValidationError("Value is not a JSON.") from exc
+
+    raise ValidationError("Value cannot be converted to a dict.")

@@ -1,14 +1,17 @@
 <template>
-  <div v-if="showEntry" class="context__menu-item">
+  <div
+    v-if="showEntry && featureFlagEnabled && (hasPermission || !hasFeature)"
+    class="context__menu-item"
+  >
     <div>
       <a
         class="context__menu-item-link"
         @click="
           () => {
-            if (deactivated) {
-              $refs.paidFeaturesModal.show()
-            } else {
+            if (hasFeature) {
               $refs.dateDependencyModal.show()
+            } else {
+              $refs.paidFeaturesModal.show()
             }
             $emit('hide-context')
           }
@@ -16,7 +19,7 @@
       >
         <i class="context__menu-item-icon baserow-icon-dependency"></i>
         {{ $t('dateDependencyModal.contextMenuItemLabel') }}
-        <div v-if="deactivated" class="deactivated-label">
+        <div v-if="!hasFeature" class="deactivated-label">
           <i class="iconoir-lock"></i>
         </div>
       </a>
@@ -40,6 +43,7 @@
 import EnterpriseFeatures from '@baserow_enterprise/features'
 import PaidFeaturesModal from '@baserow_premium/components/PaidFeaturesModal'
 import DateDependencyModal from '@baserow_enterprise/components/dateDependency/DateDependencyModal.vue'
+import { FF_DATE_DEPENDENCY } from '@baserow/modules/core/plugins/featureFlags'
 
 export default {
   name: 'DateDependencyMenuItem',
@@ -66,19 +70,34 @@ export default {
     },
   },
   computed: {
-    deactivated() {
-      return !this.$hasFeature(
+    hasFeature() {
+      return this.$hasFeature(
         EnterpriseFeatures.DATE_DEPENDENCY,
         this.database.workspace.id
       )
     },
+    featureFlagEnabled() {
+      return this.$featureFlagIsEnabled(FF_DATE_DEPENDENCY)
+    },
+    hasPermission() {
+      return this.$hasPermission(
+        'database.table.field_rules.set_field_rules',
+        this.table,
+        this.database.workspace.id
+      )
+    },
     showEntry() {
+      // Menu entry requested outside a field context (i.e. table sidebar menu,
+      // view menu), so we can show it always.
       if (!this.field) {
         return true
       }
       return (
         (this.field.type === 'date' && !this.field.date_include_time) ||
-        (this.field.type === 'duration' && this.field.duration_format === 'd h')
+        (this.field.type === 'duration' &&
+          this.field.duration_format === 'd h') ||
+        (this.field.type === 'link_row' &&
+          this.field.link_row_table_id === this.table.id)
       )
     },
   },

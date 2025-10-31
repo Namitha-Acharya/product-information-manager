@@ -33,10 +33,12 @@ def test_automation_workflow_serializer_fields(workflow_fixture):
     assert sorted(serializer.data.keys()) == [
         "allow_test_run_until",
         "automation_id",
+        "graph",
         "id",
         "name",
         "order",
         "published_on",
+        "simulate_until_node_id",
         "state",
     ]
 

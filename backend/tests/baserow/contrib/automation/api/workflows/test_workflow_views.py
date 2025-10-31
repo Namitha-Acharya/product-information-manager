@@ -27,6 +27,7 @@ API_URL_WORKFLOW_ITEM = f"{API_URL_BASE_WORKFLOW}:item"
 API_URL_WORKFLOW_PUBLISH = f"{API_URL_BASE_WORKFLOW}:async_publish"
 API_URL_WORKFLOW_DUPLICATE = f"{API_URL_BASE_WORKFLOW}:async_duplicate"
 API_URL_WORKFLOW_HISTORY = f"{API_URL_BASE_WORKFLOW}:history"
+API_URL_WORKFLOW_TEST = f"{API_URL_BASE_WORKFLOW}:test"
 
 
 @pytest.mark.django_db
@@ -53,12 +54,12 @@ def test_create_workflow(api_client, data_fixture):
         "order": AnyInt(),
         "state": "draft",
         "published_on": None,
+        "simulate_until_node_id": None,
+        "graph": {},
     }
 
     workflow = automation.workflows.get(id=response_json["id"])
-    assert workflow.automation_workflow_nodes.count() == 1
-    node = workflow.automation_workflow_nodes.get().specific
-    assert node.get_type().is_workflow_trigger
+    assert workflow.automation_workflow_nodes.count() == 0
 
 
 @pytest.mark.django_db
@@ -122,6 +123,7 @@ def test_read_workflow(api_client, data_fixture):
     user, token = data_fixture.create_user_and_token()
     automation = data_fixture.create_automation_application(user=user)
     workflow = data_fixture.create_automation_workflow(automation=automation)
+    trigger = workflow.get_trigger()
 
     url = reverse(API_URL_WORKFLOW_ITEM, kwargs={"workflow_id": workflow.id})
     response = api_client.get(
@@ -137,8 +139,10 @@ def test_read_workflow(api_client, data_fixture):
         "name": workflow.name,
         "automation_id": automation.id,
         "allow_test_run_until": None,
+        "simulate_until_node_id": None,
         "state": "draft",
         "published_on": None,
+        "graph": {"0": trigger.id, str(trigger.id): {}},
     }
 
 
@@ -338,11 +342,13 @@ def test_duplicate_workflow(api_client, data_fixture):
     workflow = data_fixture.create_automation_workflow(
         user, automation=automation, name="test"
     )
+    trigger = workflow.get_trigger()
 
     url = reverse(API_URL_WORKFLOW_DUPLICATE, kwargs={"workflow_id": workflow.id})
     response = api_client.post(url, format="json", HTTP_AUTHORIZATION=f"JWT {token}")
 
     assert response.status_code == HTTP_202_ACCEPTED
+
     assert response.json() == {
         "duplicated_automation_workflow": None,
         "human_readable_error": "",
@@ -355,6 +361,8 @@ def test_duplicate_workflow(api_client, data_fixture):
             "order": AnyInt(),
             "state": "draft",
             "published_on": None,
+            "simulate_until_node_id": None,
+            "graph": {"0": trigger.id, str(trigger.id): {}},
         },
         "progress_percentage": 0,
         "state": "pending",
@@ -370,21 +378,16 @@ def test_enable_workflow_test_run(api_client, data_fixture):
         workflow = data_fixture.create_automation_workflow(user, name="test")
 
     assert workflow.allow_test_run_until is None
-    url = reverse(API_URL_WORKFLOW_ITEM, kwargs={"workflow_id": workflow.id})
+
+    url = reverse(API_URL_WORKFLOW_TEST, kwargs={"workflow_id": workflow.id})
 
     with freeze_time(frozen_time):
-        response = api_client.patch(
-            url,
-            {"allow_test_run": True},
-            format="json",
-            HTTP_AUTHORIZATION=f"JWT {token}",
+        response = api_client.post(
+            url, format="json", HTTP_AUTHORIZATION=f"JWT {token}"
         )
 
-    assert response.status_code == HTTP_200_OK
-    assert (
-        response.json()["allow_test_run_until"]
-        == f"2025-06-04T11:0{ALLOW_TEST_RUN_MINUTES}:00Z"
-    )
+    assert response.status_code == HTTP_202_ACCEPTED
+
     workflow.refresh_from_db()
     assert workflow.allow_test_run_until == datetime.datetime(
         2025, 6, 4, 11, ALLOW_TEST_RUN_MINUTES, tzinfo=datetime.timezone.utc
@@ -401,13 +404,11 @@ def test_disable_workflow_test_run(api_client, data_fixture):
     workflow.allow_test_run_until = timezone.now()
     workflow.save()
 
-    url = reverse(API_URL_WORKFLOW_ITEM, kwargs={"workflow_id": workflow.id})
-    response = api_client.patch(
-        url, {"allow_test_run": False}, format="json", HTTP_AUTHORIZATION=f"JWT {token}"
-    )
+    url = reverse(API_URL_WORKFLOW_TEST, kwargs={"workflow_id": workflow.id})
+    response = api_client.post(url, format="json", HTTP_AUTHORIZATION=f"JWT {token}")
 
-    assert response.status_code == HTTP_200_OK
-    assert response.json()["allow_test_run_until"] is None
+    assert response.status_code == HTTP_202_ACCEPTED
+
     workflow.refresh_from_db()
     assert workflow.allow_test_run_until is None
 
@@ -422,11 +423,17 @@ def test_run_workflow_in_test_mode(api_client, data_fixture):
         columns=[("Name", "text"), ("Color", "text")],
         rows=[["BMW", "Blue"]],
     )
-    workflow = data_fixture.create_automation_workflow(
-        user=user, trigger_service_kwargs={"table": table_1}
-    )
+    workflow = data_fixture.create_automation_workflow(user=user, create_trigger=False)
     workflow.automation.published_from = original_workflow
     workflow.automation.save()
+
+    trigger_service = data_fixture.create_local_baserow_rows_created_service(
+        table=table_1,
+        integration=data_fixture.create_local_baserow_integration(user=user),
+    )
+    trigger_node = data_fixture.create_automation_node(
+        user=user, workflow=workflow, type="rows_created", service=trigger_service
+    )
 
     # Next create an action node
     table_2, fields_2, _ = data_fixture.build_table(
@@ -442,7 +449,7 @@ def test_run_workflow_in_test_mode(api_client, data_fixture):
         field=fields_2[0],
         value="'A new row'",
     )
-    data_fixture.create_automation_node(
+    action_node = data_fixture.create_automation_node(
         user=user,
         workflow=workflow,
         type="create_row",
@@ -450,13 +457,15 @@ def test_run_workflow_in_test_mode(api_client, data_fixture):
     )
 
     # Enable the test run
-    url = reverse(API_URL_WORKFLOW_ITEM, kwargs={"workflow_id": workflow.id})
-    api_client.patch(
-        url, {"allow_test_run": True}, format="json", HTTP_AUTHORIZATION=f"JWT {token}"
-    )
+    url = reverse(API_URL_WORKFLOW_TEST, kwargs={"workflow_id": workflow.id})
+    api_client.post(url, format="json", HTTP_AUTHORIZATION=f"JWT {token}")
+
     workflow.refresh_from_db()
     assert workflow.allow_test_run_until is not None
     assert workflow.is_published is False
+
+    assert trigger_node.service.sample_data is None
+    assert action_node.service.sample_data is None
 
     # Insert a row to cause the trigger node to run
     row_handler = RowHandler()
@@ -472,8 +481,8 @@ def test_run_workflow_in_test_mode(api_client, data_fixture):
     # Now the 2nd table should have a new row entry
     model = table_2.get_model()
     assert model.objects.count() == 1
-    row = model.objects.order_by("-id").first()
-    assert getattr(row, f"field_{fields_2[0].id}") == "A new row"
+    action_row = model.objects.order_by("-id").first()
+    assert getattr(action_row, f"field_{fields_2[0].id}") == "A new row"
 
 
 @pytest.mark.django_db

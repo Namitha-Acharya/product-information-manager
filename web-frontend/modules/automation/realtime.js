@@ -1,5 +1,3 @@
-import { generateHash } from '@baserow/modules/core/utils/hashing'
-
 export const registerRealtimeEvents = (realtime) => {
   // Workflow events
   realtime.registerEvent('automation_workflow_created', ({ store }, data) => {
@@ -63,19 +61,47 @@ export const registerRealtimeEvents = (realtime) => {
     }
   })
 
-  realtime.registerEvent(
-    'automation_workflows_reordered',
-    ({ store, app }, data) => {
-      const automation = store.getters['application/getAll'].find(
-        (application) => generateHash(application.id) === data.automation_id
-      )
-      if (automation !== undefined) {
-        store.commit('automationWorkflow/ORDER_WORKFLOWS', {
-          automation,
-          order: data.order,
-          isHashed: true,
-        })
-      }
+  // Workflow node events
+  realtime.registerEvent('automation_node_created', ({ store }, data) => {
+    const workflow = store.getters['automationWorkflow/getSelected']
+    if (workflow && workflow.id === data.node.workflow) {
+      store.dispatch('automationWorkflowNode/forceCreate', {
+        workflow,
+        node: data.node,
+      })
     }
-  )
+  })
+
+  realtime.registerEvent('automation_node_updated', ({ store }, data) => {
+    const workflow = store.getters['automationWorkflow/getSelected']
+    const node = data.node
+    if (!workflow || !node) return
+    if (workflow.id !== (node.workflow || node.workflow_id)) return
+
+    const existing = store.getters['automationWorkflowNode/findById'](
+      workflow,
+      node.id
+    )
+    if (!existing) return
+
+    store.dispatch('automationWorkflowNode/forceUpdate', {
+      workflow,
+      node: existing,
+      values: node,
+      override: true,
+    })
+  })
+
+  realtime.registerEvent('automation_node_deleted', ({ store }, data) => {
+    const workflow = store.getters['automationWorkflow/getSelected']
+    const nodeId = data.node_id || data.node?.id
+    const workflowId = data.workflow || data.workflow_id || data.node?.workflow
+    if (!workflow || !nodeId) return
+    if (workflowId && workflow.id !== workflowId) return
+
+    store.dispatch('automationWorkflowNode/forceDelete', {
+      workflow,
+      nodeId,
+    })
+  })
 }

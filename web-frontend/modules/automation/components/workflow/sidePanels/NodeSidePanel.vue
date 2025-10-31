@@ -30,10 +30,12 @@
       :application="automation"
       enable-integration-picker
       :default-values="node.service"
-      :edge-in-use-fn="nodeEdgeInUseFn"
       class="margin-top-2"
       @values-changed="handleNodeChange({ service: $event })"
     />
+
+    <div class="separator"></div>
+    <SimulateDispatchNodeForm :automation="automation" :node="node" />
   </ReadOnlyForm>
 </template>
 
@@ -50,9 +52,11 @@ import useVuelidate from '@vuelidate/core'
 import { reactive, ref } from 'vue'
 import ReadOnlyForm from '@baserow/modules/core/components/ReadOnlyForm'
 import AutomationBuilderFormulaInput from '@baserow/modules/automation/components/AutomationBuilderFormulaInput'
+import SimulateDispatchNodeForm from '@baserow/modules/automation/components/form/SimulateDispatchNodeForm'
 import { DATA_PROVIDERS_ALLOWED_NODE_ACTIONS } from '@baserow/modules/automation/enums'
 import _ from 'lodash'
 import { helpers, maxLength } from '@vuelidate/validators'
+import { notifyIf } from '@baserow/modules/core/utils/error'
 
 const store = useStore()
 const { app } = useContext()
@@ -119,7 +123,7 @@ const handleNodeChange = async ({
   node: nodeChanges,
   service: serviceChanges,
 }) => {
-  let updatedNode = { ...node.value }
+  let updatedNode = {}
   let anyChanges = false
 
   // Handle node changes first
@@ -140,14 +144,17 @@ const handleNodeChange = async ({
     )
 
     if (Object.keys(nodeDifferences).length > 0) {
-      updatedNode = { ...updatedNode, ...nodeDifferences }
+      updatedNode = nodeDifferences
       anyChanges = true
     }
   }
 
   // Handle service changes next
   if (serviceChanges) {
-    if (!formComponent.value?.isFormValid()) {
+    if (
+      formComponent.value?.isFormValid &&
+      !formComponent.value?.isFormValid()
+    ) {
       return
     }
     const serviceDifferences = Object.fromEntries(
@@ -157,7 +164,7 @@ const handleNodeChange = async ({
     )
 
     if (Object.keys(serviceDifferences).length > 0) {
-      updatedNode.service = { ...updatedNode.service, ...serviceDifferences }
+      updatedNode.service = { ...node.value.service, ...serviceDifferences }
       anyChanges = true
     }
   }
@@ -167,25 +174,18 @@ const handleNodeChange = async ({
     return
   }
 
-  await store.dispatch('automationWorkflowNode/updateDebounced', {
-    workflow: workflow.value,
-    node: node.value,
-    values: updatedNode,
-  })
+  try {
+    await store.dispatch('automationWorkflowNode/updateDebounced', {
+      workflow: workflow.value,
+      node: node.value,
+      values: updatedNode,
+    })
+  } catch (error) {
+    notifyIf(error, 'automationWorkflow')
+  }
 }
 
 const nodeLoading = computed(() => {
   return store.getters['automationWorkflowNode/getLoading'](node.value)
 })
-
-/**
- * Responsible for informing the core router service form if an edge has an
- * output. As the service form can't refer to automation nodes, we have to
- * perform the check here, and pass the function as a prop into the form.
- */
-const nodeEdgeInUseFn = (edge) => {
-  return store.getters['automationWorkflowNode/getNodes'](workflow.value).some(
-    (node) => node.previous_node_output === edge.uid
-  )
-}
 </script>

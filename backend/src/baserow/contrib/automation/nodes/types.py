@@ -1,9 +1,21 @@
 from dataclasses import dataclass
-from typing import Any, List, NewType, TypedDict
+from typing import Any, Literal, NewType, TypeAlias, TypedDict
 
-from baserow.contrib.automation.nodes.models import AutomationNode
+from django.db import models
+
+from baserow.contrib.automation.nodes.models import AutomationActionNode, AutomationNode
 
 AutomationNodeForUpdate = NewType("AutomationNodeForUpdate", AutomationNode)
+
+
+class NodePosition(models.TextChoices):
+    SOUTH = "south", "South"
+    CHILD = "child", "Child"
+
+
+NodePositionType = Literal["south", "child"]
+
+NodePositionTriplet: TypeAlias = tuple[AutomationNode | None, NodePositionType, str]
 
 
 @dataclass
@@ -21,25 +33,17 @@ class ReplacedAutomationNode:
 
 
 @dataclass
-class NextAutomationNodeValues:
-    id: int
-    previous_node_id: int
-    previous_node_output: str
-
-
-@dataclass
-class AutomationNodeDuplication:
-    source_node: AutomationNode
-    source_node_next_nodes_values: List[NextAutomationNodeValues]
-    duplicated_node: AutomationNode
-    duplicated_node_next_nodes_values: List[NextAutomationNodeValues]
+class AutomationNodeMove:
+    # The node we're trying to move.
+    node: AutomationActionNode
+    previous_reference_node: AutomationActionNode | None
+    previous_position: NodePositionType
+    previous_output: str
 
 
 class AutomationNodeDict(TypedDict):
     id: int
     type: str
-    order: float
+    label: str
+    service: dict
     workflow_id: int
-    parent_node_id: int
-    previous_node_id: int
-    previous_node_output: str

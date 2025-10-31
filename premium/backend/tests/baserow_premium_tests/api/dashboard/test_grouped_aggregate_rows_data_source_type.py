@@ -10,6 +10,9 @@ from rest_framework.status import HTTP_200_OK
 
 from baserow.contrib.database.rows.handler import RowHandler
 from baserow.contrib.database.views.models import SORT_ORDER_ASC
+from baserow.core.formula import BaserowFormulaObject
+from baserow.core.formula.field import BASEROW_FORMULA_VERSION_INITIAL
+from baserow.core.formula.types import BASEROW_FORMULA_MODE_SIMPLE
 from baserow.test_utils.helpers import AnyDict, AnyInt
 
 
@@ -128,6 +131,7 @@ def test_grouped_aggregate_rows_get_dashboard_data_sources(
         "table_id": table.id,
         "type": "local_baserow_grouped_aggregate_rows",
         "view_id": None,
+        "sample_data": None,
     }
     assert response_json[1] == {
         "context_data": None,
@@ -142,10 +146,15 @@ def test_grouped_aggregate_rows_get_dashboard_data_sources(
         "name": "Name 2",
         "order": "2.00000000000000000000",
         "schema": None,
-        "search_query": "",
+        "search_query": BaserowFormulaObject(
+            formula="",
+            version=BASEROW_FORMULA_VERSION_INITIAL,
+            mode=BASEROW_FORMULA_MODE_SIMPLE,
+        ),
         "table_id": None,
         "type": "local_baserow_list_rows",
         "view_id": None,
+        "sample_data": None,
     }
 
 

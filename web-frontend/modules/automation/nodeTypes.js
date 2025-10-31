@@ -2,6 +2,8 @@ import { Registerable } from '@baserow/modules/core/registry'
 import {
   ActionNodeTypeMixin,
   TriggerNodeTypeMixin,
+  UtilityNodeMixin,
+  containerNodeTypeMixin,
 } from '@baserow/modules/automation/nodeTypeMixins'
 import {
   LocalBaserowCreateRowWorkflowServiceType,
@@ -19,6 +21,8 @@ import {
   CoreHTTPRequestServiceType,
   CoreRouterServiceType,
   CoreSMTPEmailServiceType,
+  CoreHTTPTriggerServiceType,
+  CoreIteratorServiceType,
 } from '@baserow/modules/integrations/core/serviceTypes'
 import { uuid } from '@baserow/modules/core/utils/string'
 
@@ -54,6 +58,13 @@ export class NodeType extends Registerable {
   }
 
   /**
+   * Returns the text to be displayed on the graph just before the node.
+   */
+  getBeforeLabel({ workflow, node }) {
+    return this.app.i18n.t('workflowNode.beforeLabelAction')
+  }
+
+  /**
    * The node type's description.
    * The description is derived from the service type's description.
    * @returns {string} - The node's description.
@@ -75,8 +86,9 @@ export class NodeType extends Registerable {
    * The icon which is shown inside the editor's node.
    * @returns {string} - The node's icon class.
    */
+
   get iconClass() {
-    return 'iconoir-table'
+    return this.serviceType.icon
   }
 
   /**
@@ -102,6 +114,16 @@ export class NodeType extends Registerable {
    */
   get formComponent() {
     return this.serviceType.formComponent
+  }
+
+  /**
+   * Whether this node type can be moved around the workflow. By default,
+   * all nodes can be moved. This can be overridden by the node type
+   * to prevent moving.
+   * @returns {boolean} - Whether the node can be moved.
+   */
+  get isFixed() {
+    return false
   }
 
   /**
@@ -195,13 +217,21 @@ export class NodeType extends Registerable {
     const serviceSchema = this.serviceType.getDataSchema(node.service)
     if (serviceSchema) {
       return {
-        type: this.dataType,
+        ...serviceSchema,
         title: this.getLabel({ automation, node }),
-        properties: serviceSchema.properties || {},
-        items: serviceSchema.items || [],
       }
     }
     return null
+  }
+
+  /**
+   * Returns the sample data for this node.
+   */
+  getSampleData({ service }) {
+    if (!service) {
+      return null
+    }
+    return this.serviceType.getSampleData(service)
   }
 
   getEdges({ node }) {
@@ -327,6 +357,79 @@ export class LocalBaserowRowsDeletedTriggerNodeType extends TriggerNodeTypeMixin
       'service',
       LocalBaserowRowsDeletedTriggerServiceType.getType()
     )
+  }
+}
+
+export class CorePeriodicTriggerNodeType extends TriggerNodeTypeMixin(
+  NodeType
+) {
+  static getType() {
+    return 'periodic'
+  }
+
+  getOrder() {
+    return 4
+  }
+
+  get iconClass() {
+    return 'iconoir-timer'
+  }
+
+  get name() {
+    return this.app.i18n.t('nodeType.periodicTriggerLabel')
+  }
+
+  get serviceType() {
+    return this.app.$registry.get('service', 'periodic')
+  }
+
+  getDefaultLabel({ node }) {
+    if (!node.service) {
+      return this.name
+    }
+
+    const intervalLabels = {
+      MINUTE: this.app.i18n.t('periodicForm.everyMinute'),
+      HOUR: this.app.i18n.t('periodicForm.everyHour'),
+      DAY: this.app.i18n.t('periodicForm.everyDay'),
+      WEEK: this.app.i18n.t('periodicForm.everyWeek'),
+      MONTH: this.app.i18n.t('periodicForm.everyMonth'),
+    }
+
+    return intervalLabels[node.service.interval] || this.name
+  }
+}
+
+export class CoreHTTPTriggerNodeType extends TriggerNodeTypeMixin(NodeType) {
+  static getType() {
+    return 'http_trigger'
+  }
+
+  get name() {
+    return this.app.i18n.t('serviceType.coreHTTPTrigger')
+  }
+
+  get description() {
+    return this.app.i18n.t('serviceType.coreHTTPTriggerDescription')
+  }
+
+  get iconClass() {
+    return 'iconoir-globe'
+  }
+
+  get serviceType() {
+    return this.app.$registry.get(
+      'service',
+      CoreHTTPTriggerServiceType.getType()
+    )
+  }
+
+  getOrder() {
+    return 4
+  }
+
+  getDefaultLabel({ automation, node }) {
+    return this.app.i18n.t('serviceType.coreHTTPTrigger')
   }
 }
 
@@ -497,6 +600,74 @@ export class CoreHttpRequestNodeType extends ActionNodeTypeMixin(NodeType) {
   }
 }
 
+export class CoreIteratorNodeType extends containerNodeTypeMixin(
+  ActionNodeTypeMixin(NodeType)
+) {
+  static getType() {
+    return 'iterator'
+  }
+
+  getOrder() {
+    return 8
+  }
+
+  get name() {
+    return this.app.i18n.t('nodeType.iterationLabel')
+  }
+
+  get serviceType() {
+    return this.app.$registry.get('service', CoreIteratorServiceType.getType())
+  }
+
+  /**
+   * Responsible for checking if the router node can be deleted. It can't be
+   * if it has output nodes connected to its edges.
+   * @param workflow - The workflow the router belongs to.
+   * @param node - The router node for which the deletability is being checked.
+   * @returns {string} - An error message if the router cannot be deleted.
+   */
+  getDeleteErrorMessage({ workflow, node }) {
+    const children = this.app.store.getters[
+      'automationWorkflowNode/getChildren'
+    ](workflow, node)
+    const count = children.length
+    if (count) {
+      return this.app.i18n.t('nodeType.iteratorWithChildrenNodesDeleteError', {
+        count,
+      })
+    }
+    return ''
+  }
+
+  getBeforeLabel({ workflow, node, position, output }) {
+    if (position === 'child') {
+      return this.app.i18n.t('workflowNode.beforeLabelRepeat')
+    }
+
+    return super.getBeforeLabel({ workflow, node, position, output })
+  }
+
+  /**
+   * Responsible for checking if the router node can be replaced. It can't be
+   * if it has output nodes connected to its edges.
+   * @param workflow - The workflow the router belongs to.
+   * @param node - The router node for which the replaceability is being checked.
+   * @returns {string} - An error message if the router cannot be replaced.
+   */
+  getReplaceErrorMessage({ workflow, node }) {
+    const children = this.app.store.getters[
+      'automationWorkflowNode/getChildren'
+    ](workflow, node)
+    const count = children.length
+    if (count) {
+      return this.app.i18n.t('nodeType.iteratorWithChildrenNodesReplaceError', {
+        count,
+      })
+    }
+    return ''
+  }
+}
+
 export class CoreSMTPEmailNodeType extends ActionNodeTypeMixin(NodeType) {
   static getType() {
     return 'smtp_email'
@@ -504,10 +675,6 @@ export class CoreSMTPEmailNodeType extends ActionNodeTypeMixin(NodeType) {
 
   getOrder() {
     return 8
-  }
-
-  get iconClass() {
-    return 'iconoir-send-mail'
   }
 
   get name() {
@@ -519,9 +686,28 @@ export class CoreSMTPEmailNodeType extends ActionNodeTypeMixin(NodeType) {
   }
 }
 
-export class CoreRouterNodeType extends ActionNodeTypeMixin(NodeType) {
+export class CoreRouterNodeType extends ActionNodeTypeMixin(
+  UtilityNodeMixin(NodeType)
+) {
   static getType() {
     return 'router'
+  }
+
+  /**
+   * Router nodes cannot be moved around the workflow, due to complications
+   * with managing their output nodes. This will be improved in the future,
+   * but for now, this node type is fixed.
+   * @returns {boolean} - Whether the node can be moved.
+   */
+  get isFixed() {
+    return true
+  }
+
+  getBeforeLabel({ workflow, node, position, output }) {
+    if (output.length > 0) {
+      return this.app.i18n.t('workflowNode.beforeLabelCondition')
+    }
+    return this.app.i18n.t('workflowNode.beforeLabelConditionDefault')
   }
 
   getOrder() {
@@ -535,10 +721,6 @@ export class CoreRouterNodeType extends ActionNodeTypeMixin(NodeType) {
           edgeCount: this.getEdges({ node }).length,
         })
       : this.name
-  }
-
-  get iconClass() {
-    return 'iconoir-git-fork'
   }
 
   get serviceType() {
@@ -609,13 +791,9 @@ export class CoreRouterNodeType extends ActionNodeTypeMixin(NodeType) {
    * @returns {Array} - An array of output nodes that are connected to the router's edges.
    */
   getOutputNodes({ workflow, router }) {
-    const edgeUids = this.getEdges({ node: router }).map((edge) => edge.uid)
-    return this.app.store.getters['automationWorkflowNode/getNodes'](
-      workflow
-    ).filter(
-      (node) =>
-        node.previous_node_id === router.id &&
-        edgeUids.includes(node.previous_node_output)
+    return this.app.store.getters['automationWorkflowNode/getNextNodes'](
+      workflow,
+      router
     )
   }
 

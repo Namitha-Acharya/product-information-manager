@@ -10,7 +10,9 @@
           :applications="applications"
           :collapsed="isCollapsed"
           :width="col1Width"
+          :right-sidebar-open="col3Visible"
           @set-col1-width="col1Width = $event"
+          @open-workspace-search="openWorkspaceSearch"
         ></Sidebar>
       </div>
       <div
@@ -37,24 +39,40 @@
         :max="300"
         @move="resizeCol1($event)"
       ></HorizontalResize>
+      <HorizontalResize
+        v-if="col3Visible"
+        class="layout__resize"
+        :width="col3Width"
+        :style="{ right: col3Width - 3 + 'px' }"
+        :min="300"
+        :max="500"
+        :right="true"
+        @move="resizeCol3($event)"
+      ></HorizontalResize>
       <component
         :is="component"
         v-for="(component, index) in appLayoutComponents"
         :key="index"
       ></component>
     </div>
+    <WorkspaceSearchModal
+      v-if="$featureFlagIsEnabled(FF_WORKSPACE_SEARCH)"
+      ref="workspaceSearchModal"
+    ></WorkspaceSearchModal>
   </div>
 </template>
 
 <script>
 import { mapGetters, mapState } from 'vuex'
 
+import { FF_WORKSPACE_SEARCH } from '@baserow/modules/core/plugins/featureFlags'
 import Toasts from '@baserow/modules/core/components/toasts/Toasts'
 import Sidebar from '@baserow/modules/core/components/sidebar/Sidebar'
 import RightSidebar from '@baserow/modules/core/components/sidebar/RightSidebar'
 import undoRedo from '@baserow/modules/core/mixins/undoRedo'
 import HorizontalResize from '@baserow/modules/core/components/HorizontalResize'
 import GuidedTour from '@baserow/modules/core/components/guidedTour/GuidedTour'
+import WorkspaceSearchModal from '@baserow/modules/core/components/workspace/WorkspaceSearchModal.vue'
 import { CORE_ACTION_SCOPES } from '@baserow/modules/core/utils/undoRedoConstants'
 import {
   isOsSpecificModifierPressed,
@@ -68,6 +86,7 @@ export default {
     RightSidebar,
     HorizontalResize,
     GuidedTour,
+    WorkspaceSearchModal,
   },
   mixins: [undoRedo],
   middleware: [
@@ -81,6 +100,7 @@ export default {
       col1Width: 240,
       col3Width: 400,
       col3Visible: false,
+      FF_WORKSPACE_SEARCH,
     }
   },
   computed: {
@@ -148,6 +168,17 @@ export default {
   },
   methods: {
     keyDown(event) {
+      // Handle workspace search shortcut (Ctrl/Cmd + K) - only if feature enabled
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'k' &&
+        this.$featureFlagIsEnabled(FF_WORKSPACE_SEARCH)
+      ) {
+        event.preventDefault()
+        this.openWorkspaceSearch()
+        return
+      }
+
       if (
         isOsSpecificModifierPressed(event) &&
         event.key.toLowerCase() === 'z'
@@ -167,8 +198,21 @@ export default {
       }
       keyboardShortcutsToPriorityEventBus(event, this.$priorityBus)
     },
+
+    openWorkspaceSearch() {
+      if (
+        this.selectedWorkspace &&
+        this.$refs.workspaceSearchModal &&
+        this.$featureFlagIsEnabled(FF_WORKSPACE_SEARCH)
+      ) {
+        this.$refs.workspaceSearchModal.show()
+      }
+    },
     resizeCol1(event) {
       this.col1Width = event
+    },
+    resizeCol3(event) {
+      this.col3Width = event
     },
     toggleRightSidebar() {
       this.col3Visible = !this.col3Visible

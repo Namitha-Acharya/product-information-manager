@@ -322,7 +322,7 @@
     "dateDependencyContent": "You can define a dependency between two dates and a duration as start/end date and duration. With date dependency, if one value change, other values will be adjusted accordingly."
   },
   "assistantSidebarItem": {
-    "title": "AI Assistant"
+    "title": "Kuma AI"
   },
   "assistantPanel": {
     "title": "AI Assistant",
@@ -332,8 +332,8 @@
   },
   "assistantWelcomeMessage": {
     "greet": "Hey {name}",
-    "question": "how can I help?",
-    "subtitle": "I'm here to support you in handling your data."
+    "question": "my name is Kuma!",
+    "subtitle": "I’ll help you bear the load so it never feels heavy. Choose from the prompts below or just tell me what you need!"
   },
   "assistantInputMessage": {
     "statusWaiting": "Assistant is ready to help",
@@ -341,9 +341,23 @@
     "placeholder": "Ask me anything...",
     "send": "Send message"
   },
+  "assistant": {
+    "statusThinking": "Thinking...",
+    "statusAnswering": "Answering..."
+  },
   "assistantChatHistoryContext": {
     "empty": "No chat history available",
     "loading": "Loading chat history..."
+  },
+  "assistantMessageSources": {
+    "sources": "{count} source | {count} sources"
+  },
+  "assistantMessageActions": {
+    "feedbackContextTitle": "Help us improve",
+    "feedbackContextPlaceholder": "What could we improve? (optional)",
+    "copiedToClipboard": "Copied to clipboard",
+    "copiedContentToast": "The Assistant's response content has been copied to your clipboard",
+    "copyFailed": "Failed to copy to clipboard"
   },
   "chatwootSupportSidebarWorkspace": {
     "directSupport": "Direct support"
@@ -641,8 +655,8 @@
     "endDateFieldLabel": "End date",
     "durationFieldLabel": "Duration",
     "durationFieldHint": "This field must use the “d h” format.",
-    "dependencyFieldLabel": "Dependency",
-    "dependencyFieldHint": "Use a Link to table field to connect a row to its predecessors or successors.",
+    "dependencyLinkrowFieldLabel": "Predecessors",
+    "dependencyLinkrowFieldHint": "Use a Link to table field to connect a row to its predecessors.",
     "dependencyBufferTypeLabel": "Rescheduling logic",
     "durationBufferLabel": "Time buffer",
     "dependencyConnectionTypeLabel": "Type",

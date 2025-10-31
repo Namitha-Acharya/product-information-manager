@@ -87,8 +87,6 @@ class AIFieldType(CollationSortMixin, SelectOptionBaseFieldType):
         "ai_prompt": FormulaSerializerField(
             help_text="The prompt that must run for each row. Must be an formula.",
             required=False,
-            allow_blank=True,
-            default="",
         ),
         "ai_file_field_id": serializers.IntegerField(
             min_value=1,
@@ -249,6 +247,17 @@ class AIFieldType(CollationSortMixin, SelectOptionBaseFieldType):
         baserow_field_type = self.get_baserow_field_type(field)
         return baserow_field_type.get_group_by_field_filters_and_annotations(
             field, field_name, base_queryset, value, cte, rows
+        )
+
+    def get_formula_reference_to_model_field(
+        self, model_field, db_column, already_in_subquery
+    ):
+        instance = model_field.model.get_field_object(
+            model_field.name, include_trash=True
+        )["field"]
+        baserow_field_type = self.get_baserow_field_type(instance)
+        return baserow_field_type.get_formula_reference_to_model_field(
+            model_field, db_column, already_in_subquery
         )
 
     def get_export_serialized_value(

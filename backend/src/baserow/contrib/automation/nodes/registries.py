@@ -2,15 +2,14 @@ from typing import Any, Dict, Optional
 
 from django.contrib.auth.models import AbstractUser
 
-from rest_framework import serializers
-
 from baserow.contrib.automation.automation_dispatch_context import (
     AutomationDispatchContext,
 )
 from baserow.contrib.automation.formula_importer import import_formula
 from baserow.contrib.automation.nodes.exceptions import AutomationNodeNotReplaceable
 from baserow.contrib.automation.nodes.models import AutomationNode
-from baserow.contrib.automation.nodes.types import AutomationNodeDict
+from baserow.contrib.automation.nodes.types import AutomationNodeDict, NodePositionType
+from baserow.contrib.automation.workflows.models import AutomationWorkflow
 from baserow.core.integrations.models import Integration
 from baserow.core.registry import (
     CustomFieldsRegistryMixin,
@@ -22,9 +21,10 @@ from baserow.core.registry import (
     PublicCustomFieldsInstanceMixin,
     Registry,
 )
-from baserow.core.services.exceptions import InvalidServiceTypeDispatchSource
 from baserow.core.services.handler import ServiceHandler
 from baserow.core.services.registries import ServiceTypeSubClass, service_type_registry
+from baserow.core.services.types import DispatchResult
+from baserow.core.trash.registries import TrashOperationType
 
 
 class AutomationNodeType(
@@ -38,36 +38,22 @@ class AutomationNodeType(
     parent_property_name = "workflow"
     id_mapping_name = "automation_workflow_nodes"
 
-    request_serializer_field_names = ["previous_node_id", "previous_node_output"]
-    request_serializer_field_overrides = {
-        "previous_node_id": serializers.IntegerField(
-            required=False,
-            default=None,
-            allow_null=True,
-        ),
-        "previous_node_output": serializers.CharField(
-            required=False,
-            default="",
-            allow_blank=True,
-            help_text="The output of the previous node.",
-        ),
-    }
-
+    # Whether this node type is a trigger. Triggers start workflows.
     is_workflow_trigger = False
+
+    # Whether this node type is an action.
+    # Actions are executed as part of workflows.
     is_workflow_action = False
 
+    is_container = False
+
     class SerializedDict(AutomationNodeDict):
-        label: str
-        service: Dict
-        parent_node_id: Optional[int]
-        previous_node_id: Optional[int]
+        ...
 
     @property
     def allowed_fields(self):
         return super().allowed_fields + [
             "label",
-            "previous_node_id",
-            "previous_node_output",
             "service",
         ]
 
@@ -78,8 +64,6 @@ class AutomationNodeType(
 
         :param node: The node instance to about to be deleted.
         """
-
-        ...
 
     def before_replace(self, node: AutomationNode, new_node_type: Instance) -> None:
         """
@@ -97,6 +81,27 @@ class AutomationNodeType(
                 "category. Triggers cannot be updated with actions, and vice-versa."
             )
 
+    def before_move(
+        self,
+        node: AutomationNode,
+        reference_node: AutomationNode | None,
+        position: NodePositionType,
+        output: str,
+    ):
+        """Called before the node is moved."""
+
+    def before_create(
+        self,
+        workflow: AutomationWorkflow,
+        reference_node: AutomationNode | None,
+        position: NodePositionType,
+        output: str,
+    ):
+        """
+        A hook called just before a node is created. Can be
+        overridden by subclasses to implement specific logic.
+        """
+
     def after_create(self, node: AutomationNode) -> None:
         """
         A hook called just after a node is created. Can be
@@ -104,8 +109,6 @@ class AutomationNodeType(
 
         :param node: The node instance that was just created.
         """
-
-        ...
 
     def get_service_type(self) -> Optional[ServiceTypeSubClass]:
         return (
@@ -151,9 +154,6 @@ class AutomationNodeType(
         storage=None,
         cache=None,
     ):
-        if prop_name == "order":
-            return str(node.order)
-
         if prop_name == "service":
             service = node.service.specific
             return service.get_type().export_serialized(
@@ -187,12 +187,6 @@ class AutomationNodeType(
         :return: the deserialized version for this property.
         """
 
-        if prop_name in ["previous_node_id", "parent_node_id"] and value:
-            return id_mapping["automation_workflow_nodes"][value]
-
-        if prop_name == "previous_node_output" and value:
-            return id_mapping["automation_edge_outputs"].get(value, value)
-
         if prop_name == "service" and value:
             integration = None
             serialized_service = value
@@ -211,6 +205,7 @@ class AutomationNodeType(
                 cache=cache,
                 files_zip=files_zip,
                 import_formula=import_formula,
+                import_export_config=kwargs.get("import_export_config"),
             )
         return super().deserialize_property(
             prop_name,
@@ -255,6 +250,8 @@ class AutomationNodeType(
         :return: The modified node values, prepared.
         """
 
+        from baserow.contrib.automation.nodes.handler import AutomationNodeHandler
+
         service_type = service_type_registry.get(self.service_type)
 
         if not instance:
@@ -277,6 +274,12 @@ class AutomationNodeType(
         )
 
         values["service"] = service
+
+        if (reference_node_id := values.get("reference_node_id", None)) is not None:
+            values["reference_node"] = AutomationNodeHandler().get_node(
+                reference_node_id
+            )
+
         return values
 
     def get_pytest_params(self, pytest_data_fixture) -> Dict[str, Any]:
@@ -286,8 +289,10 @@ class AutomationNodeType(
         self,
         automation_node: AutomationNode,
         dispatch_context: AutomationDispatchContext,
-    ):
-        raise InvalidServiceTypeDispatchSource("This service cannot be dispatched.")
+    ) -> DispatchResult:
+        return ServiceHandler().dispatch_service(
+            automation_node.service.specific, dispatch_context
+        )
 
 
 class AutomationNodeTypeRegistry(
@@ -298,6 +303,30 @@ class AutomationNodeTypeRegistry(
     """Contains all registered automation node types."""
 
     name = "automation_node_type"
+
+
+class ReplaceAutomationNodeTrashOperationType(TrashOperationType):
+    """
+    The replace-automation-node trash operation is used when an automation node is
+    replaced with another node type. This operation type exists to ensure that extra
+    steps are followed when the node is restored from its trashed state.
+    """
+
+    type = "replace_automation_node"
+
+    """
+    This trash operation type is 'managed'. We don't want users to interact with
+    it in the workspace trash, the system is responsible for it.
+    """
+    managed = True
+
+    """
+    In this trash operation type we don't want to send any created or deleted signals.
+    We need to be precise with our realtime signals, so at a strategic time we use
+    the `replace` signal instead.
+    """
+    send_post_restore_created_signal = False
+    send_post_trash_deleted_signal = False
 
 
 automation_node_type_registry = AutomationNodeTypeRegistry()

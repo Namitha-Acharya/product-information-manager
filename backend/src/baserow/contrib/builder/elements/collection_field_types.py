@@ -1,4 +1,4 @@
-from typing import Any, Dict, Generator, TypedDict, Union
+from typing import Any, Dict, Generator, TypedDict
 
 from django.core.validators import MinValueValidator
 
@@ -9,11 +9,8 @@ from baserow.contrib.builder.elements.models import CollectionField, LinkElement
 from baserow.contrib.builder.elements.registries import CollectionFieldType
 from baserow.contrib.builder.workflow_actions.models import BuilderWorkflowAction
 from baserow.core.constants import RatingStyleChoices
-from baserow.core.formula.serializers import (
-    FormulaSerializerField,
-    OptionalFormulaSerializerField,
-)
-from baserow.core.formula.types import BaserowFormula
+from baserow.core.formula.serializers import FormulaSerializerField
+from baserow.core.formula.types import BaserowFormulaObject
 from baserow.core.registry import Instance
 
 
@@ -24,7 +21,7 @@ class BooleanCollectionFieldType(CollectionFieldType):
     simple_formula_fields = ["value"]
 
     class SerializedDict(TypedDict):
-        value: bool
+        value: BaserowFormulaObject
 
     @property
     def serializer_field_overrides(self):
@@ -32,8 +29,6 @@ class BooleanCollectionFieldType(CollectionFieldType):
             "value": FormulaSerializerField(
                 help_text="The boolean value.",
                 required=False,
-                allow_blank=True,
-                default=False,
             ),
         }
 
@@ -45,7 +40,7 @@ class RatingCollectionFieldType(CollectionFieldType):
     simple_formula_fields = ["value"]
 
     class SerializedDict(TypedDict):
-        value: BaserowFormula
+        value: BaserowFormulaObject
         color: str
         rating_style: str
         max_value: int
@@ -56,8 +51,6 @@ class RatingCollectionFieldType(CollectionFieldType):
             "value": FormulaSerializerField(
                 help_text="The rating value.",
                 required=False,
-                allow_blank=True,
-                default="",
             ),
             "color": serializers.CharField(
                 help_text="The color of the rating.",
@@ -87,7 +80,7 @@ class TextCollectionFieldType(CollectionFieldType):
     simple_formula_fields = ["value"]
 
     class SerializedDict(TypedDict):
-        value: str
+        value: BaserowFormulaObject
 
     @property
     def serializer_field_overrides(self):
@@ -95,8 +88,6 @@ class TextCollectionFieldType(CollectionFieldType):
             "value": FormulaSerializerField(
                 help_text="The formula for the text.",
                 required=False,
-                allow_blank=True,
-                default="",
             ),
         }
 
@@ -171,8 +162,6 @@ class LinkCollectionFieldType(CollectionFieldType):
                 "link_name": FormulaSerializerField(
                     help_text="The formula for the link name.",
                     required=False,
-                    allow_blank=True,
-                    default="",
                 ),
                 "variant": serializers.ChoiceField(
                     choices=LinkElement.VARIANTS.choices,
@@ -238,24 +227,24 @@ class TagsCollectionFieldType(CollectionFieldType):
     simple_formula_fields = ["values"]
 
     class SerializedDict(TypedDict):
-        values: str
+        values: BaserowFormulaObject
         colors_is_formula: bool
-        colors: Union[BaserowFormula, str]
+        colors: BaserowFormulaObject
 
     @property
     def serializer_field_overrides(self):
+        from baserow.contrib.builder.api.elements.serializers import (
+            CollectionFieldOptionalFormulaSerializerField,
+        )
+
         return {
             "values": FormulaSerializerField(
                 help_text="The formula for the tags values",
                 required=False,
-                allow_blank=True,
-                default="",
             ),
-            "colors": OptionalFormulaSerializerField(
+            "colors": CollectionFieldOptionalFormulaSerializerField(
                 help_text="The formula or value for the tags colors",
                 required=False,
-                allow_blank=True,
-                default="",
                 is_formula_field_name="colors_is_formula",
             ),
             "colors_is_formula": serializers.BooleanField(
@@ -291,7 +280,7 @@ class ButtonCollectionFieldType(CollectionFieldType):
     simple_formula_fields = ["label"]
 
     class SerializedDict(TypedDict):
-        label: str
+        label: BaserowFormulaObject
 
     @property
     def serializer_field_overrides(self):
@@ -299,8 +288,6 @@ class ButtonCollectionFieldType(CollectionFieldType):
             "label": FormulaSerializerField(
                 help_text="The string value.",
                 required=False,
-                allow_blank=True,
-                default="",
             ),
         }
 
@@ -316,8 +303,8 @@ class ImageCollectionFieldType(CollectionFieldType):
     simple_formula_fields = ["src", "alt"]
 
     class SerializedDict(TypedDict):
-        src: BaserowFormula
-        alt: BaserowFormula
+        src: BaserowFormulaObject
+        alt: BaserowFormulaObject
 
     @property
     def serializer_field_overrides(self):
@@ -325,13 +312,9 @@ class ImageCollectionFieldType(CollectionFieldType):
             "src": FormulaSerializerField(
                 help_text="A link to the image file",
                 required=False,
-                allow_blank=True,
-                default="",
             ),
             "alt": FormulaSerializerField(
                 help_text="A brief text description of the image",
                 required=False,
-                allow_blank=True,
-                default="",
             ),
         }

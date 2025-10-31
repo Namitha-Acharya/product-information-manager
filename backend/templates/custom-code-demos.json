@@ -1,7 +1,7 @@
 {
     "baserow_template_version": 1,
     "name": "Custom code demos",
-    "icon": "",
+    "icon": "iconoir-code",
     "keywords": [
         "application",
         "builder",
@@ -12,7 +12,8 @@
         "baserow"
     ],
     "categories": [
-        "Baserow"
+        "Baserow",
+        "🔥 Most Popular"
     ],
     "open_application": 1568,
     "export": [

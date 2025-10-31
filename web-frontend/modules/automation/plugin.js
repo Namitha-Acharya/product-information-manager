@@ -26,10 +26,13 @@ import {
   LocalBaserowRowsCreatedTriggerNodeType,
   LocalBaserowRowsUpdatedTriggerNodeType,
   LocalBaserowRowsDeletedTriggerNodeType,
+  CoreHTTPTriggerNodeType,
   LocalBaserowAggregateRowsActionNodeType,
   CoreHttpRequestNodeType,
+  CoreIteratorNodeType,
   CoreSMTPEmailNodeType,
   CoreRouterNodeType,
+  CorePeriodicTriggerNodeType,
 } from '@baserow/modules/automation/nodeTypes'
 import {
   DuplicateAutomationWorkflowJobType,
@@ -40,7 +43,13 @@ import {
   HistoryEditorSidePanelType,
   NodeEditorSidePanelType,
 } from '@baserow/modules/automation/editorSidePanelTypes'
-import { PreviousNodeDataProviderType } from '@baserow/modules/automation/dataProviderTypes'
+import { AutomationSearchType } from '@baserow/modules/automation/searchTypes'
+import { searchTypeRegistry } from '@baserow/modules/core/search/types/registry'
+import { AutomationGuidedTourType } from '@baserow/modules/automation/guidedTourTypes'
+import {
+  PreviousNodeDataProviderType,
+  CurrentIterationDataProviderType,
+} from '@baserow/modules/automation/dataProviderTypes'
 
 export default (context) => {
   const { app, isDev, store } = context
@@ -79,6 +88,10 @@ export default (context) => {
       new PreviousNodeDataProviderType(context)
     )
     app.$registry.register(
+      'automationDataProvider',
+      new CurrentIterationDataProviderType(context)
+    )
+    app.$registry.register(
       'node',
       new LocalBaserowRowsCreatedTriggerNodeType(context)
     )
@@ -90,6 +103,7 @@ export default (context) => {
       'node',
       new LocalBaserowRowsDeletedTriggerNodeType(context)
     )
+    app.$registry.register('node', new CoreHTTPTriggerNodeType(context))
     app.$registry.register(
       'node',
       new LocalBaserowCreateRowActionNodeType(context)
@@ -101,6 +115,7 @@ export default (context) => {
     app.$registry.register('node', new CoreHttpRequestNodeType(context))
     app.$registry.register('node', new CoreSMTPEmailNodeType(context))
     app.$registry.register('node', new CoreRouterNodeType(context))
+    app.$registry.register('node', new CoreIteratorNodeType(context))
     app.$registry.register(
       'node',
       new LocalBaserowDeleteRowActionNodeType(context)
@@ -117,6 +132,7 @@ export default (context) => {
       'node',
       new LocalBaserowAggregateRowsActionNodeType(context)
     )
+    app.$registry.register('node', new CorePeriodicTriggerNodeType(context))
     app.$registry.register(
       'job',
       new DuplicateAutomationWorkflowJobType(context)
@@ -139,5 +155,9 @@ export default (context) => {
       'editorSidePanel',
       new HistoryEditorSidePanelType(context)
     )
+
+    // Register automation search type
+    searchTypeRegistry.register(new AutomationSearchType())
+    app.$registry.register('guidedTour', new AutomationGuidedTourType(context))
   }
 }

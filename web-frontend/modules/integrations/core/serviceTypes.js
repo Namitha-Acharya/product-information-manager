@@ -1,16 +1,24 @@
+import CoreHTTPTriggerServiceForm from '@baserow/modules/integrations/core/components/services/CoreHTTPTriggerServiceForm'
 import {
   ServiceType,
+  TriggerServiceTypeMixin,
   WorkflowActionServiceTypeMixin,
 } from '@baserow/modules/core/serviceTypes'
 import CoreHTTPRequestServiceForm from '@baserow/modules/integrations/core/components/services/CoreHTTPRequestServiceForm'
 import CoreSMTPEmailServiceForm from '@baserow/modules/integrations/core/components/services/CoreSMTPEmailServiceForm'
 import CoreRouterServiceForm from '@baserow/modules/integrations/core/components/services/CoreRouterServiceForm'
+import CoreIteratorServiceForm from '@baserow/modules/integrations/core/components/services/CoreIteratorServiceForm'
+import CorePeriodicServiceForm from '@baserow/modules/integrations/core/components/services/CorePeriodicServiceForm.vue'
 
 export class CoreHTTPRequestServiceType extends WorkflowActionServiceTypeMixin(
   ServiceType
 ) {
   static getType() {
     return 'http_request'
+  }
+
+  get icon() {
+    return 'iconoir-cloud-upload'
   }
 
   get name() {
@@ -57,6 +65,10 @@ export class CoreSMTPEmailServiceType extends WorkflowActionServiceTypeMixin(
 
   get description() {
     return this.app.i18n.t('serviceType.coreSMTPEmailDescription')
+  }
+
+  get icon() {
+    return 'iconoir-send-mail'
   }
 
   getErrorMessage({ service }) {
@@ -107,10 +119,14 @@ export class CoreRouterServiceType extends WorkflowActionServiceTypeMixin(
     return this.app.i18n.t('serviceType.coreRouterDescription')
   }
 
+  get icon() {
+    return 'iconoir-git-fork'
+  }
+
   getEdgeErrorMessage(edge) {
     if (!edge.label.length) {
       return this.app.i18n.t('serviceType.coreRouterEdgeLabelRequired')
-    } else if (!edge.condition.length) {
+    } else if (!edge.condition.formula) {
       return this.app.i18n.t('serviceType.coreRouterEdgeConditionRequired')
     }
     return null
@@ -120,7 +136,7 @@ export class CoreRouterServiceType extends WorkflowActionServiceTypeMixin(
     if (service === undefined) {
       return null
     }
-    if (!service.edges.length) {
+    if (!service.edges?.length) {
       return this.app.i18n.t('serviceType.coreRouterEdgesRequired')
     }
     const hasEdgeInError = service.edges.some((edge) => {
@@ -142,5 +158,112 @@ export class CoreRouterServiceType extends WorkflowActionServiceTypeMixin(
 
   getOrder() {
     return 7
+  }
+}
+
+export class CoreHTTPTriggerServiceType extends TriggerServiceTypeMixin(
+  ServiceType
+) {
+  static getType() {
+    return 'http_trigger'
+  }
+
+  get name() {
+    return this.app.i18n.t('serviceType.coreHTTPTrigger')
+  }
+
+  get description() {
+    return this.app.i18n.t('serviceType.coreHTTPTriggerDescription')
+  }
+
+  get formComponent() {
+    return CoreHTTPTriggerServiceForm
+  }
+
+  getErrorMessage({ service }) {
+    if (service === undefined) {
+      return null
+    }
+
+    return super.getErrorMessage({ service })
+  }
+
+  getDataSchema(service) {
+    return service.schema
+  }
+
+  getOrder() {
+    return 8
+  }
+}
+
+export class CoreIteratorServiceType extends WorkflowActionServiceTypeMixin(
+  ServiceType
+) {
+  static getType() {
+    return 'iterator'
+  }
+
+  get name() {
+    return this.app.i18n.t('serviceType.coreIteration')
+  }
+
+  get description() {
+    return this.app.i18n.t('serviceType.coreIterationDescription')
+  }
+
+  get icon() {
+    return 'iconoir-repeat'
+  }
+
+  getErrorMessage({ service }) {
+    if (!service?.source?.formula) {
+      return this.app.i18n.t('serviceType.errorIterationSourceMissing')
+    }
+
+    return super.getErrorMessage({ service })
+  }
+
+  getDataSchema(service) {
+    return service.schema
+  }
+
+  get formComponent() {
+    return CoreIteratorServiceForm
+  }
+
+  getOrder() {
+    return 5
+  }
+}
+
+export class PeriodicTriggerServiceType extends TriggerServiceTypeMixin(
+  ServiceType
+) {
+  static getType() {
+    return 'periodic'
+  }
+
+  get name() {
+    return this.app.i18n.t('serviceType.corePeriodic')
+  }
+
+  get description() {
+    return this.app.i18n.t('serviceType.corePeriodicDescription')
+  }
+
+  get formComponent() {
+    return CorePeriodicServiceForm
+  }
+
+  getDataSchema(service) {
+    return service.schema
+  }
+
+  getErrorMessage({ service }) {
+    if (!service?.interval) {
+      return this.app.i18n.t('serviceType.corePeriodicErrorIntervalMissing')
+    }
+    return super.getErrorMessage({ service })
   }
 }

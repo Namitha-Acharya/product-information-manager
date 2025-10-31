@@ -3,8 +3,30 @@
     "page": "Page",
     "of": "of {pages}"
   },
+  "workspaceSearch": {
+    "title": "Search",
+    "searchEverything": "Search...",
+    "searching": "Searching...",
+    "noResults": "No results found",
+    "noResultsSubtitle": "We couldn't find anything matching \"{searchTerm}\"",
+    "welcome": "Search everything in your workspace",
+    "welcomeSubtitle": "Use the search box above to find applications, tables, fields, and more",
+    "navigate": "Navigate",
+    "select": "Select",
+    "close": "Close",
+    "types": {
+      "applications": "Applications",
+      "tables": "Tables", 
+      "fields": "Fields",
+      "rows": "Rows"
+    }
+  },
   "copied": {
     "label": "Copied!"
+  },
+  "action": {
+    "cancel": "Cancel",
+    "submit": "Submit"
   },
   "sidebarApplication": {
     "rename": "Rename",
@@ -423,7 +445,7 @@
     "tweetContent": "Check out @baserow an open source no-code database tool and Airtable alternative!",
     "redditTitle": "'Baserow - An open source no-code database",
     "becomeGithubSponsor": "Become a GitHub sponsor",
-    "starOnGitlab": "Star us on GitLab",
+    "starOnGitHub": "Star us on GitHub",
     "shareOnTwitter": "Tweet about Baserow",
     "shareOnReddit": "Share on Reddit",
     "shareOnFacebook": "Share on Facebook",
@@ -733,11 +755,16 @@
     "submitButton": "Update frequency"
   },
   "formulaInputField": {
-    "errorInvalidFormula": "The formula is invalid."
+    "errorInvalidFormula": "The formula is invalid.",
+    "advancedFormulaMode": "Advanced formula mode"
   },
   "dataExplorer": {
     "noMatchingNodesText": "No matching results were found.",
     "noProvidersText": "No data providers were found. To get started you can, for example, add a data source or page parameter."
+  },
+  "dataExplorerNode": {
+    "showMore": "Show more repetitions",
+    "selectNode": "Select"
   },
   "richTextEditorBubbleMenu": {
     "bold": "Bold",
@@ -819,9 +846,6 @@
   "imageInput": {
     "labelDescription": "Select an image to upload...",
     "labelButton": "Upload"
-  },
-  "dataExplorerNode": {
-    "showMore": "Show more repetitions"
   },
   "user": {
     "isStaff": "Is staff",
@@ -971,5 +995,18 @@
     "claudeInstructions": "Three simple steps to get started with Claude Desktop and the Baserow MCP.\n\n1. Open the Claude Desktop settings from the navigation bar. (⌘+,)\n1. Go to the \"Develop\" tab, and click on \"Edit Config\".\n1. Include the following JSON configuration in `claude_desktop_config.json`.",
     "cursorInstructions": "Three simple steps to get started with Cursor and the Baserow MCP.\n\n1. Open Cursor settings (⇧+⌘+J)\n1. Navigate to the \"MCP\" tab and click \"Add MCP Server\"\n1. Add the following JSON configuration.",
     "windsurfInstructions": "Two easy steps to set up MCP with Cascase in Windsurf.\n\n1. Navigate to Windsurf - Settings -> Advanced Settings or Command Palette -> Open Windsurf settings page.\n1. Scroll down to the Cascade section and you will find the option to add a new server, view existing servers, and a button to view the raw JSON config file at `mcp_config.json`. Add the following to it:"
+  },
+  "coreHTTPTriggerServiceForm": {
+    "title": "Webhook URL",
+    "urlVersion": "Version",
+    "urlVersionPublished": "Published",
+    "urlVersionTest": "Test",
+    "copyUrl": "Copy Webhook URL",
+    "urlCopied": "Webhook URL copied to clipboard",
+    "description": "This webhook will receive HTTP requests and trigger the workflow with the request data as the payload.",
+    "methodsOptionLabel": "Allowed HTTP methods",
+    "methodsOptionDescription": "Controls which HTTP methods are allowed for this webhook. Excluding GET reduces the chance of the webhook being triggered accidentally.",
+    "methodsOptionAll": "All",
+    "methodsOptionExcludeGet": "Exclude GET"
   }
 }

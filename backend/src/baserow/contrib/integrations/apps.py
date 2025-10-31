@@ -22,9 +22,9 @@ class IntegrationsConfig(AppConfig):
             LocalBaserowDeleteRowServiceType,
             LocalBaserowGetRowUserServiceType,
             LocalBaserowListRowsUserServiceType,
-            LocalBaserowRowsCreatedTriggerServiceType,
-            LocalBaserowRowsDeletedTriggerServiceType,
-            LocalBaserowRowsUpdatedTriggerServiceType,
+            LocalBaserowRowsCreatedServiceType,
+            LocalBaserowRowsDeletedServiceType,
+            LocalBaserowRowsUpdatedServiceType,
             LocalBaserowUpsertRowServiceType,
         )
 
@@ -33,12 +33,15 @@ class IntegrationsConfig(AppConfig):
         service_type_registry.register(LocalBaserowAggregateRowsUserServiceType())
         service_type_registry.register(LocalBaserowUpsertRowServiceType())
         service_type_registry.register(LocalBaserowDeleteRowServiceType())
-        service_type_registry.register(LocalBaserowRowsCreatedTriggerServiceType())
-        service_type_registry.register(LocalBaserowRowsUpdatedTriggerServiceType())
-        service_type_registry.register(LocalBaserowRowsDeletedTriggerServiceType())
+        service_type_registry.register(LocalBaserowRowsCreatedServiceType())
+        service_type_registry.register(LocalBaserowRowsUpdatedServiceType())
+        service_type_registry.register(LocalBaserowRowsDeletedServiceType())
 
         from baserow.contrib.integrations.core.service_types import (
             CoreHTTPRequestServiceType,
+            CoreHTTPTriggerServiceType,
+            CoreIteratorServiceType,
+            CorePeriodicServiceType,
             CoreRouterServiceType,
             CoreSMTPEmailServiceType,
         )
@@ -46,5 +49,8 @@ class IntegrationsConfig(AppConfig):
         service_type_registry.register(CoreHTTPRequestServiceType())
         service_type_registry.register(CoreSMTPEmailServiceType())
         service_type_registry.register(CoreRouterServiceType())
+        service_type_registry.register(CoreHTTPTriggerServiceType())
+        service_type_registry.register(CoreIteratorServiceType())
+        service_type_registry.register(CorePeriodicServiceType())
 
         import baserow.contrib.integrations.signals  # noqa: F403, F401

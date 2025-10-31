@@ -3971,12 +3971,19 @@ class FileFieldType(FieldType):
             if files_zip is None:
                 files.append(file)
             else:
-                with files_zip.open(file["name"]) as stream:
-                    # Try to upload the user file with the original name to make sure
-                    # that if the was already uploaded, it will not be uploaded again.
-                    user_file = user_file_handler.upload_user_file(
-                        None, file["original_name"], stream, storage=storage
-                    )
+                try:
+                    with files_zip.open(file["name"]) as stream:
+                        # Try to upload the user file with the original name
+                        # to make sure that if the was already uploaded, it will
+                        # not be uploaded again.
+                        user_file = user_file_handler.upload_user_file(
+                            None, file["original_name"], stream, storage=storage
+                        )
+                except KeyError:
+                    # File not found in zip archive - skip this file and
+                    # let the import process report handle missing files
+                    # appropriately
+                    continue
 
                 value = user_file.serialize()
                 value["visible_name"] = file["visible_name"]
@@ -5251,21 +5258,16 @@ class MultipleSelectFieldType(
     def get_formula_reference_to_model_field(
         self, model_field, db_column, already_in_subquery
     ):
+        agg_expr = JSONBAgg(
+            get_select_option_extractor(db_column, model_field),
+            filter=Q(**{f"{db_column}__isnull": False}),
+            ordering=(f"{db_column}__order", f"{db_column}__id"),
+        )
         if already_in_subquery:
-            return Coalesce(
-                JSONBAgg(
-                    get_select_option_extractor(db_column, model_field),
-                    filter=Q(**{f"{db_column}__isnull": False}),
-                ),
-                Value([], output_field=JSONField()),
-            )
+            return Coalesce(agg_expr, Value([], output_field=JSONField()))
         else:
             return Coalesce(
-                wrap_in_subquery(
-                    JSONBAgg(get_select_option_extractor(db_column, model_field)),
-                    db_column,
-                    model_field.model,
-                ),
+                wrap_in_subquery(agg_expr, db_column, model_field.model),
                 Value([], output_field=JSONField()),
             )
 

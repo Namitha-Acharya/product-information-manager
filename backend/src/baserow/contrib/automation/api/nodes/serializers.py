@@ -10,6 +10,7 @@ from baserow.api.services.serializers import (
 )
 from baserow.contrib.automation.nodes.models import AutomationNode
 from baserow.contrib.automation.nodes.registries import automation_node_type_registry
+from baserow.contrib.automation.nodes.types import NodePosition
 
 
 class AutomationNodeSerializer(serializers.ModelSerializer):
@@ -29,20 +30,15 @@ class AutomationNodeSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "label",
-            "order",
             "service",
             "workflow",
             "type",
-            "previous_node_id",
-            "previous_node_output",
         )
 
         extra_kwargs = {
             "id": {"read_only": True},
             "workflow_id": {"read_only": True},
             "type": {"read_only": True},
-            "previous_node_id": {"read_only": True},
-            "order": {"read_only": True, "help_text": "Lowest first."},
         }
 
 
@@ -52,15 +48,19 @@ class CreateAutomationNodeSerializer(serializers.ModelSerializer):
         required=True,
         help_text="The type of the automation node",
     )
-    before_id = serializers.IntegerField(
+    reference_node_id = serializers.IntegerField(
         required=False,
-        help_text="If provided, creates the node before the node with the given id.",
+        allow_null=True,
+        help_text="If provided, creates the node relative to the node with the "
+        "given id.",
     )
-    previous_node_id = serializers.IntegerField(
+    position = serializers.ChoiceField(
+        choices=NodePosition.choices,
         required=False,
-        help_text="If provided, creates the node after this given id.",
+        allow_blank=True,
+        help_text="The position of the new node relative to the reference node.",
     )
-    previous_node_output = serializers.CharField(
+    output = serializers.CharField(
         required=False,
         allow_blank=True,
         help_text="The unique ID of the branch this node is an output for.",
@@ -68,7 +68,13 @@ class CreateAutomationNodeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AutomationNode
-        fields = ("id", "type", "before_id", "previous_node_id", "previous_node_output")
+        fields = (
+            "id",
+            "type",
+            "reference_node_id",
+            "position",
+            "output",
+        )
 
 
 class UpdateAutomationNodeSerializer(serializers.ModelSerializer):
@@ -81,15 +87,7 @@ class UpdateAutomationNodeSerializer(serializers.ModelSerializer):
         fields = (
             "label",
             "service",
-            "previous_node_output",
         )
-
-
-class OrderAutomationNodesSerializer(serializers.Serializer):
-    node_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        help_text=("The ids of the nodes in the order they are supposed to be set in."),
-    )
 
 
 class ReplaceAutomationNodeSerializer(serializers.Serializer):
@@ -97,4 +95,22 @@ class ReplaceAutomationNodeSerializer(serializers.Serializer):
         choices=lazy(automation_node_type_registry.get_types, list)(),
         required=True,
         help_text="The type of the new automation node",
+    )
+
+
+class MoveAutomationNodeSerializer(serializers.Serializer):
+    reference_node_id = serializers.IntegerField(
+        required=False,
+        help_text="The reference node.",
+    )
+    position = serializers.ChoiceField(
+        choices=NodePosition.choices,
+        required=False,
+        allow_blank=True,
+        help_text="The new position relative to the reference node.",
+    )
+    output = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="The new output.",
     )

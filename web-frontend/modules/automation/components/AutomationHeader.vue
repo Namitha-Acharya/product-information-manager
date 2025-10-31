@@ -1,7 +1,7 @@
 <template>
   <header class="layout__col-2-1 header header--space-between">
-    <ul v-if="isDev" class="header__filter">
-      <li class="header__filter-item">
+    <ul class="header__filter">
+      <li v-if="isDev" class="header__filter-item">
         <a data-item-type="settings" class="header__filter-link"
           ><i class="header__filter-icon iconoir-settings"></i>
           <span class="header__filter-name">{{
@@ -12,6 +12,7 @@
       <li class="header__filter-item">
         <a
           data-item-type="history"
+          data-highlight="automation-history"
           class="header__filter-link"
           :class="{ 'active--primary': activeSidePanel === 'history' }"
           @click="historyClick()"
@@ -22,6 +23,18 @@
         </a>
       </li>
       <li class="header__filter-item">
+        <a
+          data-highlight="automation-docs"
+          class="header__filter-link"
+          target="_blank"
+          href="https://baserow.io/user-docs/workflow-automation"
+          ><i class="header__filter-icon iconoir-help-circle"></i>
+          <span class="header__filter-name">{{
+            $t('automationHeader.docsBtn')
+          }}</span>
+        </a>
+      </li>
+      <li v-if="isDev" class="header__filter-item">
         <a
           data-item-type="debug"
           class="header__filter-link"
@@ -57,6 +70,7 @@
         </template>
         <SwitchInput
           small
+          data-highlight="automation-workflow-state"
           :value="statusSwitch"
           :disabled="isDisabled || !publishedOn"
           @input="toggleStatusSwitch"
@@ -72,6 +86,8 @@
         <Button
           :icon="testRunEnabled ? 'iconoir-cancel' : 'iconoir-play'"
           type="secondary"
+          data-highlight="automation-test-run"
+          :disabled="testRunDisabled"
           @click="toggleTestRun"
           >{{
             testRunEnabled
@@ -80,6 +96,7 @@
           }}</Button
         >
         <Button
+          data-highlight="automation-publish"
           :loading="isPublishing"
           :disabled="isPublishing || !canPublishWorkflow"
           @click="publishWorkflow()"
@@ -99,6 +116,8 @@ import { useStore, inject, useContext } from '@nuxtjs/composition-api'
 import { HistoryEditorSidePanelType } from '@baserow/modules/automation/editorSidePanelTypes'
 import { notifyIf } from '@baserow/modules/core/utils/error'
 import { WORKFLOW_STATES } from '@baserow/modules/automation/components/enums'
+
+import NodeGraphHandler from '@baserow/modules/automation/utils/nodeGraphHandler'
 
 export default defineComponent({
   name: 'AutomationHeader',
@@ -128,8 +147,15 @@ export default defineComponent({
       }
     })
 
+    const testRunDisabled = computed(() => {
+      return !new NodeGraphHandler(workflow.value).hasNodes()
+    })
+
     const testRunEnabled = computed(() => {
-      return moment(workflow.value?.allow_test_run_until).isAfter()
+      return (
+        moment(workflow.value?.allow_test_run_until).isAfter() ||
+        Number.isInteger(workflow.value?.simulate_until_node_id)
+      )
     })
 
     const hasActionNode = computed(() => {
@@ -181,9 +207,8 @@ export default defineComponent({
 
     const toggleTestRun = async () => {
       try {
-        await store.dispatch('automationWorkflow/toggleTestRun', {
+        await store.dispatch('automationWorkflow/testRun', {
           workflow: workflow.value,
-          allowTestRun: !testRunEnabled.value,
         })
       } catch (error) {
         notifyIf(error, 'automationWorkflow')
@@ -191,23 +216,20 @@ export default defineComponent({
     }
 
     const toggleStatusSwitch = async () => {
-      const oldValue = workflow.value.state
       const newValue =
-        oldValue === WORKFLOW_STATES.PAUSED
+        workflow.value.state === WORKFLOW_STATES.PAUSED
           ? WORKFLOW_STATES.LIVE
           : WORKFLOW_STATES.PAUSED
-      workflow.value.state = newValue
 
       try {
         await store.dispatch('automationWorkflow/update', {
           automation: props.automation,
           workflow: workflow.value,
           values: {
-            state: workflow.value.state,
+            state: newValue,
           },
         })
       } catch (error) {
-        workflow.value.state = oldValue
         notifyIf(error, 'automationWorkflow')
       }
     }
@@ -230,15 +252,12 @@ export default defineComponent({
 
     const publishWorkflow = async () => {
       isPublishing.value = true
-      const originalState = workflow.value.state
 
       try {
         await store.dispatch('automationWorkflow/publishWorkflow', {
           workflow: workflow.value,
         })
-        workflow.value.state = WORKFLOW_STATES.LIVE
       } catch (error) {
-        workflow.value.state = originalState
         notifyIf(error, 'automationWorkflow')
       }
       isPublishing.value = false
@@ -262,6 +281,7 @@ export default defineComponent({
       selectedWorkflow,
       workflow,
       activeSidePanel,
+      testRunDisabled,
     }
   },
 })

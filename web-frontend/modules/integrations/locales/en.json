@@ -31,6 +31,8 @@
     "localBaserowRowsUpdatedDescription": "Triggered when rows are updated in a Baserow table.",
     "localBaserowRowsDeleted": "Rows are deleted",
     "localBaserowRowsDeletedDescription": "Triggered when rows are deleted in a Baserow table.",
+    "coreHTTPTrigger": "Receive an HTTP Request",
+    "coreHTTPTriggerDescription": "Triggered when an HTTP request is received.",
     "coreHTTPRequest": "Send an HTTP request",
     "coreHTTPRequestDescription": "Sends an HTTP request to a specified endpoint.",
     "coreSMTPEmail": "Send Email",
@@ -40,6 +42,8 @@
     "coreRouterEdgeConditionRequired": "A branch condition is required.",
     "coreRouterDescription": "Routes the workflow to the next branch based on a condition.",
     "coreSMTPEmailDescription": "Sends an email using SMTP configuration.",
+    "coreIteration": "Iterator",
+    "coreIterationDescription": "Iterate on items.",
     "errorFromEmailMissing": "Missing From Email property",
     "errorToEmailsMissing": "Missing To Emails property",
     "misconfigured": "Misconfigured",
@@ -49,7 +53,11 @@
     "errorFilterInError": "At least one filter is misconfigured",
     "errorSortingInError": "At least one sort is misconfigured",
     "errorNoFieldSelected": "No field selected",
-    "errorNoAggregationTypeSelected": "No aggregation type selected"
+    "errorNoAggregationTypeSelected": "No aggregation type selected",
+    "corePeriodic": "Periodic trigger",
+    "corePeriodicDescription": "Triggers the workflow on a periodic basis at specified intervals",
+    "corePeriodicErrorIntervalMissing": "An interval is required.",
+    "errorIterationSourceMissing": "Missing source property"
   },
   "userSourceType": {
     "localBaserow": "Baserow table authentication"
@@ -99,7 +107,8 @@
     "filterTypeNotFound": "The filter type is not compatible.",
     "noCompatibleFilterTypesErrorTitle": "No compatible filter types",
     "noCompatibleFilterTypesErrorMessage": "None of your fields have any compatible filter types",
-    "formulaFilterInputPlaceholder": "Enter text...",
+    "textFilterInputPlaceholder": "Enter text...",
+    "formulaFilterInputPlaceholder": "Choose a formula...",
     "useFormulaForValue": "Use a formula for this filter",
     "useDefaultForValue": "Use the default filter for this field"
   },
@@ -180,6 +189,10 @@
     "body": "Body",
     "bodyPlaceholder": "Your email content..."
   },
+  "coreIterationServiceForm": {
+    "source": "Source",
+    "sourcePlaceholder": "Choose a source..."
+  },
   "routerForm": {
     "defaultEdgeLabelLabel": "Default branch label",
     "defaultEdgeLabelPlaceholder": "Default",
@@ -194,5 +207,28 @@
     "noLabel": "No label",
     "edgeDeletionLastEdge": "You cannot delete the last branch.",
     "edgeDeletionHasOutput": "A branch cannot be deleted if it has an output."
+  },
+  "periodicForm": {
+    "intervalLabel": "Interval",
+    "intervalHelper": "Choose how frequently you want this workflow to run",
+    "everyMinute": "Every minute",
+    "everyHour": "Every hour",
+    "everyDay": "Every day",
+    "everyWeek": "Every week",
+    "everyMonth": "Every month",
+    "hour": "Hour",
+    "minute": "Minute",
+    "dayOfWeek": "Day of week",
+    "dayOfMonth": "Day of month",
+    "hourPlaceholder": "0-23",
+    "minutePlaceholder": "0-59",
+    "dayOfMonthPlaceholder": "1-31",
+    "minuteHelper": "This workflow will run every minute",
+    "hourHelper": "This workflow will run every hour at the specified minute in your local timezone ({timezone})",
+    "dayHelper": "This workflow will run every day at the specified time in your local timezone ({timezone})",
+    "weekHelper": "This workflow will run every week on the specified day and time in your local timezone ({timezone})",
+    "monthHelper": "This workflow will run every month on the specified day and time in your local timezone ({timezone})",
+    "deactivatedTitle": "Periodic trigger deactivated",
+    "deactivatedText": "This periodic trigger has been automatically deactivated due to consecutive failures."
   }
 }

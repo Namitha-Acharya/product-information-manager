@@ -35,7 +35,7 @@ def test_create_ai_field_type(premium_data_fixture):
     assert ai_field.ai_output_type == "text"  # default value
     assert ai_field.ai_generative_ai_type == "test_generative_ai"
     assert ai_field.ai_generative_ai_model == "test_1"
-    assert ai_field.ai_prompt == "'Who are you?'"
+    assert ai_field.ai_prompt["formula"] == "'Who are you?'"
     assert len(AIField.objects.all()) == 1
 
 
@@ -59,7 +59,7 @@ def test_update_ai_field_type(premium_data_fixture):
     assert ai_field.ai_output_type == "text"  # default value
     assert ai_field.ai_generative_ai_type == "test_generative_ai"
     assert ai_field.ai_generative_ai_model == "test_1"
-    assert ai_field.ai_prompt == "'Who are you?'"
+    assert ai_field.ai_prompt["formula"] == "'Who are you?'"
 
 
 @pytest.mark.django_db
@@ -107,7 +107,7 @@ def test_create_ai_field_type_via_api(premium_data_fixture, api_client):
     assert response_json["ai_output_type"] == "text"
     assert response_json["ai_generative_ai_type"] == "test_generative_ai"
     assert response_json["ai_generative_ai_model"] == "test_1"
-    assert response_json["ai_prompt"] == "'Who are you?'"
+    assert response_json["ai_prompt"]["formula"] == "'Who are you?'"
     assert response_json["ai_temperature"] is None
 
 
@@ -168,7 +168,7 @@ def test_create_ai_field_type_via_api_with_ai_output_type(
     assert response_json["ai_output_type"] == "text"
     assert response_json["ai_generative_ai_type"] == "test_generative_ai"
     assert response_json["ai_generative_ai_model"] == "test_1"
-    assert response_json["ai_prompt"] == "'Who are you?'"
+    assert response_json["ai_prompt"]["formula"] == "'Who are you?'"
     assert response_json["ai_temperature"] is None
 
 
@@ -199,7 +199,7 @@ def test_create_ai_field_type_with_temperature_via_api(
     assert response.status_code == HTTP_200_OK
     assert response_json["ai_generative_ai_type"] == "test_generative_ai"
     assert response_json["ai_generative_ai_model"] == "test_1"
-    assert response_json["ai_prompt"] == "'Who are you?'"
+    assert response_json["ai_prompt"]["formula"] == "'Who are you?'"
     assert response_json["ai_temperature"] == 0.7
 
 
@@ -328,7 +328,7 @@ def test_update_ai_field_via_api_valid_output_type(premium_data_fixture, api_cli
     assert response_json["ai_output_type"] == "text"
     assert response_json["ai_generative_ai_type"] == "test_generative_ai"
     assert response_json["ai_generative_ai_model"] == "test_1"
-    assert response_json["ai_prompt"] == "'Who are you?'"
+    assert response_json["ai_prompt"]["formula"] == "'Who are you?'"
     assert response_json["ai_temperature"] is None
 
 
@@ -358,7 +358,7 @@ def test_update_to_ai_field_with_all_parameters(premium_data_fixture, api_client
     assert response_json["ai_output_type"] == "text"
     assert response_json["ai_generative_ai_type"] == "test_generative_ai"
     assert response_json["ai_generative_ai_model"] == "test_1"
-    assert response_json["ai_prompt"] == "'Who are you?'"
+    assert response_json["ai_prompt"]["formula"] == "'Who are you?'"
     assert response_json["ai_temperature"] is None
 
 
@@ -385,7 +385,7 @@ def test_update_to_ai_field_without_parameters(premium_data_fixture, api_client)
     assert response_json["ai_output_type"] == "text"
     assert response_json["ai_generative_ai_type"] == "test_generative_ai"
     assert response_json["ai_generative_ai_model"] == "test_1"
-    assert response_json["ai_prompt"] == ""
+    assert response_json["ai_prompt"]["formula"] == ""
     assert response_json["ai_temperature"] is None
 
 
@@ -746,7 +746,7 @@ def test_duplicate_table_with_ai_field(premium_data_fixture):
     assert duplicated_ai_field.ai_generative_ai_model == "test_1"
     assert duplicated_ai_field.ai_file_field_id == duplicated_file_field.id
     assert (
-        duplicated_ai_field.ai_prompt
+        duplicated_ai_field.ai_prompt["formula"]
         == f"concat('test:',get('fields.field_{duplicated_text_field.id}'))"
     )
 
@@ -785,7 +785,10 @@ def test_duplicate_table_with_ai_field_broken_references(premium_data_fixture):
     )
     duplicated_ai_field = duplicated_fields[2]
 
-    assert duplicated_ai_field.ai_prompt == f"concat('test:',get('fields.field_0'))"
+    assert (
+        duplicated_ai_field.ai_prompt["formula"]
+        == f"concat('test:',get('fields.field_0'))"
+    )
 
 
 @pytest.mark.django_db
@@ -822,7 +825,7 @@ def test_can_set_select_options_to_choice_ai_output_type(
     assert response_json["ai_output_type"] == "choice"
     assert response_json["ai_generative_ai_type"] == "test_generative_ai"
     assert response_json["ai_generative_ai_model"] == "test_1"
-    assert response_json["ai_prompt"] == "'Who are you?'"
+    assert response_json["ai_prompt"]["formula"] == "'Who are you?'"
     assert len(response_json["select_options"]) == 3
 
 
@@ -1117,3 +1120,76 @@ def test_link_row_field_can_be_sorted_when_linking_an_ai_field(premium_data_fixt
             .values_list("id", flat=True)
         )
     assert result == [row_b2.id, row_b1.id]
+
+
+@pytest.mark.django_db
+@pytest.mark.field_ai
+def test_formula_field_can_reference_ai_choice_output_without_error(
+    premium_data_fixture,
+):
+    premium_data_fixture.register_fake_generate_ai_type()
+    user = premium_data_fixture.create_user()
+    table = premium_data_fixture.create_database_table(user=user)
+
+    ai_choice_field = premium_data_fixture.create_ai_field(
+        table=table,
+        order=0,
+        name="ai_choice",
+        ai_output_type="choice",
+        ai_generative_ai_type="test_generative_ai",
+        ai_generative_ai_model="test_1",
+        ai_prompt="'pick one'",
+    )
+    premium_data_fixture.create_select_option(
+        field=ai_choice_field, value="Red", color="red", order=0
+    )
+    premium_data_fixture.create_select_option(
+        field=ai_choice_field, value="Blue", color="blue", order=1
+    )
+
+    formula_field = FieldHandler().create_field(
+        user=user,
+        table=table,
+        type_name="formula",
+        name="formula_from_ai_choice",
+        formula="field('ai_choice')",
+    )
+
+    assert formula_field is not None
+
+
+@pytest.mark.django_db
+@pytest.mark.field_ai
+def test_ai_field_can_be_used_in_lookup_expression(premium_data_fixture):
+    premium_data_fixture.register_fake_generate_ai_type()
+    user = premium_data_fixture.create_user()
+
+    source_table = premium_data_fixture.create_database_table(user=user, name="Source")
+    ai_field = premium_data_fixture.create_ai_field(
+        table=source_table,
+        order=0,
+        name="ai_text",
+        ai_output_type="text",
+        ai_generative_ai_type="test_generative_ai",
+        ai_generative_ai_model="test_1",
+        ai_prompt="'Hello World'",
+    )
+
+    target_table = premium_data_fixture.create_database_table(user=user, name="Target")
+    link_row_field = premium_data_fixture.create_link_row_field(
+        table=target_table,
+        order=0,
+        name="link_to_source",
+        link_row_table=source_table,
+    )
+
+    formula_field = FieldHandler().create_field(
+        user=user,
+        table=target_table,
+        type_name="formula",
+        name="lookup_ai_field",
+        formula="lookup('link_to_source', 'ai_text')",
+    )
+
+    assert formula_field is not None
+    assert formula_field.formula_type == "array"

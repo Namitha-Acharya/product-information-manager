@@ -1,22 +1,17 @@
 <template>
   <div class="assistant__input">
-    <div class="assistant__input-status" :class="{ 'is-running': running }">
+    <div class="assistant__input-status" :class="{ 'is-running': isRunning }">
       <i class="iconoir-sparks assistant__input-status-icon"></i>
-      <span v-if="!running" class="assistant__status-waiting">
+      <span v-if="!isRunning" class="assistant__status-message">
         {{ $t('assistantInputMessage.statusWaiting') }}
       </span>
-      <span v-else class="assistant__status-running">
-        {{ $t('assistantInputMessage.statusRunning') }}
+      <span v-else class="assistant__status-message">
+        {{ runningMessage || $t('assistant.statusThinking') }}
       </span>
     </div>
-    <div class="assistant__input-section" :class="{ 'is-running': running }">
-      <div
-        class="assistant__input-wrapper"
-        :class="{ 'has-context': contextDisplay }"
-      >
-        <div v-if="contextDisplay" class="assistant__context-badge">
-          <span class="assistant__context-text">{{ contextDisplay }}</span>
-        </div>
+    <div class="assistant__input-section" :class="{ 'is-running': isRunning }">
+      <div class="assistant__input-wrapper has-context">
+        <AssistantUiContext :ui-context="uiContext" />
 
         <textarea
           ref="textarea"
@@ -32,14 +27,14 @@
           class="assistant__send-button"
           :class="{
             'assistant__send-button--disabled':
-              !currentMessage.trim() || running,
-            'assistant__send-button--is-running': running,
+              !currentMessage.trim() || isRunning,
+            'assistant__send-button--is-running': isRunning,
           }"
-          :disabled="!currentMessage.trim() || running"
+          :disabled="!currentMessage.trim() || isRunning"
           :title="$t('assistantInputMessage.send')"
           @click="sendMessage"
         >
-          <i v-if="!running" class="iconoir-arrow-up"></i>
+          <i v-if="!isRunning" class="iconoir-arrow-up"></i>
           <i v-else class="iconoir-system-restart"></i>
         </button>
       </div>
@@ -48,16 +43,25 @@
 </template>
 
 <script>
+import AssistantUiContext from '@baserow_enterprise/components/assistant/AssistantUiContext'
+
 export default {
   name: 'AssistantInputMessage',
+  components: {
+    AssistantUiContext,
+  },
   props: {
-    contextDisplay: {
-      type: String,
-      default: '',
+    uiContext: {
+      type: Object,
+      default: () => ({}),
     },
-    running: {
+    isRunning: {
       type: Boolean,
       default: false,
+    },
+    runningMessage: {
+      type: String,
+      default: '',
     },
   },
   data() {
@@ -81,7 +85,7 @@ export default {
     },
     sendMessage() {
       const message = this.currentMessage.trim()
-      if (!message || this.running) return
+      if (!message || this.isRunning) return
 
       this.$emit('send-message', message)
 
